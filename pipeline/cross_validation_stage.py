@@ -9,6 +9,8 @@ class CrossValidationStage(StageBase):
     def __init__(self):
         self._pipeline = Pipeline()
         super().__init__()
+        self._pipeline.setLoggingPrefix('CrossValidationStage: ')
+        self.setLoggingPrefix('CrossValidationStage: ')
 
     def addStage(self, stage):
         self._pipeline.addStage(stage)
