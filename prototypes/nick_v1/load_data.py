@@ -5,7 +5,7 @@ from stage_base import StageBase
 
 import dask.dataframe as dd
 
-class DataLoader(StageBase):
+class CSVReader(StageBase):
     def __init__(self, data_dir, file_name):
         # TODO: Way to handle directory with multiple files
         self.data_path = "{}/{}".format(data_dir.rstrip('/'), file_name)
