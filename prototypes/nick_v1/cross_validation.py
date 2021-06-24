@@ -11,6 +11,8 @@ import joblib
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import roc_auc_score
 
+import pdb
+
 class GenerateCVFolds(StageBase):
     def __init__(self, strategy, strategy_args):
         self.strategy = strategy.lower()
@@ -81,16 +83,15 @@ class CrossValidationStage(StageBase):
                     cv_data_X = cv_data[features]
                     cv_data_y = cv_data[l]
                     # TODO: FIX THIS
-                    cv_data_train_X = cv_data_X.iloc[train_idx]
-                    cv_data_train_y = cv_data_y.iloc[train_idx]
-                    cv_data_test_X = cv_data_X.iloc[test_idx] 
-                    cv_data_test_y = cv_data_y.iloc[test_idx] 
-                    print('3')
+                    # pdb.set_trace()
+                    cv_data_train_X = cv_data_X.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
+                    cv_data_train_y = cv_data_y.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
+                    cv_data_test_X = cv_data_X.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
+                    cv_data_test_y = cv_data_y.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
                     # fit model
                     with joblib.parallel_backend('dask'):
                         fitted_model = model.fit(cv_data_train_X, cv_data_train_y)
                         y_preds = fitted_model.predict(cv_data_test_X)
-                        y_preds.compute()
                         predictions.append(y_preds)
                         results.append(roc_auc_score(cv_data_test_y, y_preds))
             dc.set_item('model_' + str(self.models_to_run.index(m) + 1) + '_auroc', results)
