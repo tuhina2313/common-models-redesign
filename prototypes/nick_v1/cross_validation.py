@@ -4,8 +4,12 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
 from stage_base import StageBase
 from pipeline import Pipeline
 from dask_ml.model_selection import KFold
+import dask.dataframe 
 
-
+# testing
+import joblib
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import roc_auc_score
 
 class GenerateCVFolds(StageBase):
     def __init__(self, strategy, strategy_args):
@@ -41,13 +45,18 @@ class GenerateCVFolds(StageBase):
     def execute(self):
         dc = self._inputData
         X = dc.get_item('data')
-        splits = self._generate_splits(X)
+        splits = self._generate_splits(X.to_dask_array(lengths=True))
         dc.set_item('cv_splits', splits)
         self._outputData = dc
 
 
+
+
 class CrossValidationStage(StageBase):
-    def __init__(self, train_test_splits, train_val_splits, ):
+    def __init__(self, models_to_run, labels_to_predict):
+        # TODO: make models_to_run generator function
+        self.models_to_run = [(RandomForestClassifier(), ['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)'])]
+        self.labels_to_predict = ['species']
         self._pipeline = Pipeline()
         super().__init__()
         self._pipeline.setLoggingPrefix('CrossValidationStage: ')
@@ -57,29 +66,34 @@ class CrossValidationStage(StageBase):
         self._pipeline.addStage(stage)
 
     def execute(self):
-        kf = KFold(n_splits=5, shuffle=True)
-        results = []
-        for train_idx, test_idx in kf.split(self._inputData.train_data):
-            cv_data = self._inputData.copy() # TODO: Make a new one or copy?
-            cv_data.train_data = self._inputData.train_data.iloc[train_idx]
-            cv_data.train_y = self._inputData.train_y.iloc[train_idx]
-            cv_data.test_data = self._inputData.train_data.iloc[test_idx]
-            cv_data.test_y = self._inputData.train_y.iloc[test_idx]
-
-            self._pipeline.setInput(cv_data)
-            self._pipeline.execute()
-            cv_output = self._pipeline.getOutput()
-
-            results.append(cv_output)
- 
-        # TODO: This is where we should select optimal hyperparams
-        cv_data = self._inputData.copy() # TODO: Make a new one or copy?
-        cv_data.train_data = self._inputData.train_data
-        cv_data.train_y = self._inputData.train_y
-        cv_data.test_data = self._inputData.test_data
-        cv_data.test_y = self._inputData.test_y
-
-        self._pipeline.setInput(cv_data)
-        self._pipeline.execute()
-        self._outputData = self._pipeline.getOutput()
+        dc = self._inputData
+        splits = dc.get_item("cv_splits")
+        for m in self.models_to_run:
+            model = m[0]
+            features = m[1] # what about nltk n-grams?
+            for l in self.labels_to_predict:
+                results = []
+                predictions = []
+                for s in splits:
+                    train_idx, test_idx = s
+                    cv_data = dc.get_item('data')
+                    cv_data = cv_data.copy()
+                    cv_data_X = cv_data[features]
+                    cv_data_y = cv_data[l]
+                    # TODO: FIX THIS
+                    cv_data_train_X = cv_data_X.iloc[train_idx]
+                    cv_data_train_y = cv_data_y.iloc[train_idx]
+                    cv_data_test_X = cv_data_X.iloc[test_idx] 
+                    cv_data_test_y = cv_data_y.iloc[test_idx] 
+                    print('3')
+                    # fit model
+                    with joblib.parallel_backend('dask'):
+                        fitted_model = model.fit(cv_data_train_X, cv_data_train_y)
+                        y_preds = fitted_model.predict(cv_data_test_X)
+                        y_preds.compute()
+                        predictions.append(y_preds)
+                        results.append(roc_auc_score(cv_data_test_y, y_preds))
+            dc.set_item('model_' + str(self.models_to_run.index(m) + 1) + '_auroc', results)
+            # write out predictions here
+        self._outputData = dc
         return

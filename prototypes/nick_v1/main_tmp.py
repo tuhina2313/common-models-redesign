@@ -1,7 +1,7 @@
 from load_data import CSVReader
 from preprocessing import ImputeMissingVals, FeatureScaler
 from pipeline import Pipeline
-from cross_validation import GenerateCVFolds
+from cross_validation import GenerateCVFolds, CrossValidationStage
 
 from dask.distributed import Client
 
@@ -14,6 +14,8 @@ if __name__=='__main__':
         data_dir = '../../sample_data'
         filename = 'iris_data_w_nans.csv'
         s1 = CSVReader(data_dir, filename)
+        
+        # Column declaration stage? i.e. list of features, labels to predict
         
         # init preprocessing stages
         cols = ['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)']
@@ -29,8 +31,8 @@ if __name__=='__main__':
         # Generate folds
         s4 = GenerateCVFolds(strategy='random', strategy_args=[1,2,3])
         
-        
-        #s4 = CrossValidationStage(train_test_splits=8, train_val_splits=3)
+        # Cross validation
+        s5 = CrossValidationStage('models_to_run_arg', 'labels_to_predict_arg')
         
         
         p = Pipeline()
@@ -38,8 +40,10 @@ if __name__=='__main__':
         p.addStage(s2)
         p.addStage(s3)
         p.addStage(s4)
+        p.addStage(s5)
         p.execute()
-    except:
+    except Exception as e:
+        print(e)
         client.close()
     
     client.close()
