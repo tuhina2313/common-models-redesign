@@ -1,5 +1,5 @@
 from load_data import CSVReader
-from preprocessing import ImputeMissingVals, FeatureScaler
+from preprocessing import ImputeMissingVals, FeatureScaler, OneHot
 from pipeline import Pipeline
 from cross_validation import GenerateCVFolds, CrossValidationStage
 
@@ -21,6 +21,8 @@ if __name__=='__main__':
         cols = ['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)']
         s2 = ImputeMissingVals(cols, 'constant', fill_value=0)
         s3 = FeatureScaler(cols, 'min-max')
+        categorical_cols = ['species']
+        s31 = OneHot(categorical_cols)
         
         # cross-validation
         # TESTING
@@ -39,6 +41,7 @@ if __name__=='__main__':
         p.addStage(s1)
         p.addStage(s2)
         p.addStage(s3)
+        p.addStage(s31)
         p.addStage(s4)
         p.addStage(s5)
         p.execute()

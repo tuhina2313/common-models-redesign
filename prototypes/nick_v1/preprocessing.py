@@ -3,8 +3,9 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
 from stage_base import StageBase
 
-from dask_ml.preprocessing import MinMaxScaler, StandardScaler
+from dask_ml.preprocessing import MinMaxScaler, StandardScaler, OneHotEncoder
 from dask_ml.impute import SimpleImputer
+import pdb
 
 class ImputeMissingVals(StageBase):
     def __init__(self, cols, strategy, fill_value=None):
@@ -67,6 +68,29 @@ class FeatureScaler(StageBase):
         scaled_cols = scaler.transform(cols_to_scale)
         scaled_cols.compute()
         X[self.cols] = scaled_cols
+        dc.set_item('data', X)
+        self._outputData = dc
+        return
+    
+class OneHot(StageBase):
+    def __init__(self, cols):
+        self.cols = cols
+        super().__init__()
+
+    def execute(self):
+        dc = self._inputData
+        self.logInfo("Encoding labels for columns: {}".format(self.cols))
+        X = dc.get_item('data')
+        #print (X.head())
+        cols_to_encode = X[self.cols].astype('category').categorize()
+        print (cols_to_encode)
+        encoder = OneHotEncoder()
+        #pdb.set_trace()
+        #reshaped = cols_to_encode.reshape(len(cols_to_encode), 1)
+        encoder = encoder.fit_transform(cols_to_encode)
+       # encoded_cols = encoder.transform(cols_to_encode)
+        encoder.compute()
+        X[self.cols] = encoder
         dc.set_item('data', X)
         self._outputData = dc
         return
