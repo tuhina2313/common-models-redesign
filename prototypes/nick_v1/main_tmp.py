@@ -1,5 +1,5 @@
 from load_data import CSVReader
-from preprocessing import ImputeMissingVals, FeatureScaler, OneHot
+from preprocessing import ImputeMissingVals, FeatureScaler, EncodeLabels
 from pipeline import Pipeline
 from cross_validation import GenerateCVFolds, CrossValidationStage
 
@@ -22,7 +22,7 @@ if __name__=='__main__':
         s2 = ImputeMissingVals(cols, 'constant', fill_value=0)
         s3 = FeatureScaler(cols, 'min-max')
         categorical_cols = ['species']
-        s31 = OneHot(categorical_cols)
+        s31 = EncodeLabels(categorical_cols, 'labelencoder')
         
         # cross-validation
         # TESTING

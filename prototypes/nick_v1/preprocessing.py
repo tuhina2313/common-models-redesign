@@ -3,7 +3,7 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
 from stage_base import StageBase
 
-from dask_ml.preprocessing import MinMaxScaler, StandardScaler, OneHotEncoder
+from dask_ml.preprocessing import MinMaxScaler, StandardScaler, OneHotEncoder, LabelEncoder
 from dask_ml.impute import SimpleImputer
 import pdb
 
@@ -72,25 +72,36 @@ class FeatureScaler(StageBase):
         self._outputData = dc
         return
     
-class OneHot(StageBase):
-    def __init__(self, cols):
+class EncodeLabels(StageBase):
+    def __init__(self, cols, strategy):
         self.cols = cols
-        super().__init__()
-
+        self.strategy = strategy.lower()
+        super().__init__()        
+        
+    def _get_encoder(self, strategy):
+        encoders = {
+            'onehot': OneHotEncoder(),
+            'labelencoder': LabelEncoder()
+            }
+        if strategy not in encoders.keys():
+            self.logError("encoder arg must be one of {}".format(encoders.keys()))
+        self.logInfo("Encoder strategy selected as {}".format(strategy))
+        return encoders[strategy]
+            
     def execute(self):
         dc = self._inputData
         self.logInfo("Encoding labels for columns: {}".format(self.cols))
         X = dc.get_item('data')
-        #print (X.head())
         cols_to_encode = X[self.cols].astype('category').categorize()
-        print (cols_to_encode)
-        encoder = OneHotEncoder()
+        #print (cols_to_encode)
+        encoder = self._get_encoder(self.strategy)
         #pdb.set_trace()
-        #reshaped = cols_to_encode.reshape(len(cols_to_encode), 1)
-        encoder = encoder.fit_transform(cols_to_encode)
-       # encoded_cols = encoder.transform(cols_to_encode)
-        encoder.compute()
-        X[self.cols] = encoder
+        encoded_cols = encoder.fit_transform(cols_to_encode)
+        pdb.set_trace()
+        encoded_cols.compute()
+        for col in self.cols:
+            X[col + '_encoded'] = encoded_cols[col]
+        X[self.cols] = encoded_cols
         dc.set_item('data', X)
         self._outputData = dc
         return
