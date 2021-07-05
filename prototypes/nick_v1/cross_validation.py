@@ -9,7 +9,7 @@ import dask.dataframe
 # testing
 import joblib
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, accuracy_score
 
 import pdb
 
@@ -82,8 +82,7 @@ class CrossValidationStage(StageBase):
                     cv_data = cv_data.copy()
                     cv_data_X = cv_data[features]
                     cv_data_y = cv_data[l]
-                    # TODO: FIX THIS
-                    # pdb.set_trace()
+                    # map data to CV partitions
                     cv_data_train_X = cv_data_X.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
                     cv_data_train_y = cv_data_y.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
                     cv_data_test_X = cv_data_X.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
@@ -93,8 +92,8 @@ class CrossValidationStage(StageBase):
                         fitted_model = model.fit(cv_data_train_X, cv_data_train_y)
                         y_preds = fitted_model.predict(cv_data_test_X)
                         predictions.append(y_preds)
-                        results.append(roc_auc_score(cv_data_test_y, y_preds))
-            dc.set_item('model_' + str(self.models_to_run.index(m) + 1) + '_auroc', results)
+                        results.append(accuracy_score(cv_data_test_y, y_preds))
+            dc.set_item('model_' + str(self.models_to_run.index(m) + 1) + '_accuracy', results)
             # write out predictions here
         self._outputData = dc
         return

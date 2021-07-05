@@ -22,7 +22,7 @@ if __name__=='__main__':
         s2 = ImputeMissingVals(cols, 'constant', fill_value=0)
         s3 = FeatureScaler(cols, 'min-max')
         categorical_cols = ['species']
-        s31 = EncodeLabels(categorical_cols, 'labelencoder')
+        s4 = EncodeLabels(categorical_cols, 'labelencoder')
         
         # cross-validation
         # TESTING
@@ -31,20 +31,26 @@ if __name__=='__main__':
         #cv_strategy = CrossValidationStrategy(strategy='stratified', strategy_args=(train_test_splits=8, train_val_splits=3, cols=['gender','income']))
         
         # Generate folds
-        s4 = GenerateCVFolds(strategy='random', strategy_args=[1,2,3])
+        s5 = GenerateCVFolds(strategy='random', strategy_args=[1,2,3])
         
         # Cross validation
-        s5 = CrossValidationStage('models_to_run_arg', 'labels_to_predict_arg')
+        s6 = CrossValidationStage('models_to_run_arg', 'labels_to_predict_arg')
         
         
         p = Pipeline()
         p.addStage(s1)
         p.addStage(s2)
         p.addStage(s3)
-        p.addStage(s31)
         p.addStage(s4)
         p.addStage(s5)
+        p.addStage(s6)
         p.execute()
+        
+        # TESTING
+        dc = p.getOutput()
+        data = dc.get_item('data')
+        data = data.compute()
+        results = dc.get_item('model_1_accuracy')
     except Exception as e:
         print(e)
         client.close()

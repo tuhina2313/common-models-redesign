@@ -41,6 +41,7 @@ class ImputeMissingVals(StageBase):
         return
 
 
+
 class FeatureScaler(StageBase):
     def __init__(self, cols, strategy, feature_range=(0,1)):
         self.cols = cols
@@ -72,6 +73,8 @@ class FeatureScaler(StageBase):
         self._outputData = dc
         return
     
+    
+    
 class EncodeLabels(StageBase):
     def __init__(self, cols, strategy):
         self.cols = cols
@@ -79,12 +82,30 @@ class EncodeLabels(StageBase):
         super().__init__()        
         
     def _get_encoder(self, strategy):
+        #
+        def _one_hot_encode(df, cols):
+            for col in cols:
+                encoder = OneHotEncoder()
+                col_to_encode = df[[col]].astype('category').categorize()
+                encoded_cols = encoder.fit_transform(col_to_encode)
+                for c in encoded_cols:
+                    df[c] = encoded_cols[c]
+                df = df.drop(col, axis=1)
+            return df
+        
+        def _label_encode(df, cols):
+            for col in cols:
+                encoder = LabelEncoder()
+                encoded_col = encoder.fit_transform(df[col])
+                df[col] = encoded_col
+            return df
+            
         encoders = {
-            'onehot': OneHotEncoder(),
-            'labelencoder': LabelEncoder()
+            'onehotencoder': _one_hot_encode,
+            'labelencoder': _label_encode
             }
         if strategy not in encoders.keys():
-            self.logError("encoder arg must be one of {}".format(encoders.keys()))
+            self.logError("Encoder arg must be one of {}".format(encoders.keys()))
         self.logInfo("Encoder strategy selected as {}".format(strategy))
         return encoders[strategy]
             
@@ -92,16 +113,9 @@ class EncodeLabels(StageBase):
         dc = self._inputData
         self.logInfo("Encoding labels for columns: {}".format(self.cols))
         X = dc.get_item('data')
-        cols_to_encode = X[self.cols].astype('category').categorize()
-        #print (cols_to_encode)
         encoder = self._get_encoder(self.strategy)
         #pdb.set_trace()
-        encoded_cols = encoder.fit_transform(cols_to_encode)
-        pdb.set_trace()
-        encoded_cols.compute()
-        for col in self.cols:
-            X[col + '_encoded'] = encoded_cols[col]
-        X[self.cols] = encoded_cols
+        X = encoder(X, self.cols)
         dc.set_item('data', X)
         self._outputData = dc
         return
