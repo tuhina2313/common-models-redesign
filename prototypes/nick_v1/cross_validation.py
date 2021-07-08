@@ -3,12 +3,12 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
 from stage_base import StageBase
 from pipeline import Pipeline
+from model_training import ModelTrainingStage
 from dask_ml.model_selection import KFold
-
 
 import joblib
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import roc_auc_score, accuracy_score
+from sklearn.metrics import accuracy_score
 
 import numpy as np
 
@@ -55,7 +55,7 @@ class GenerateCVFolds(StageBase):
 
 
 
-class CrossValidationStage(StageBase):
+class CrossValidationStage_dep(StageBase):
     def __init__(self):
         # TODO: make models_to_run generator function
         self.models_to_run = None
@@ -99,5 +99,52 @@ class CrossValidationStage(StageBase):
             dc.set_item(m_name + '_accuracy', results)
             dc.set_item(m_name + '_predictions', predictions)
             # write out predictions here
+        self._outputData = dc
+        return
+
+
+
+class CrossValidationStage(StageBase):
+    def __init__(self):
+        # TODO: make models_to_run generator function
+        self.models_to_run = None
+        self._pipeline = Pipeline()
+        super().__init__()
+        self._pipeline.setLoggingPrefix('CrossValidationStage: ')
+        self.setLoggingPrefix('CrossValidationStage: ')
+
+    def addStage(self, stage):
+        self._pipeline.addStage(stage)
+        
+    def execute(self):
+        dc = self._inputData
+        primary_key = dc.get_item('primary_key')
+        splits = dc.get_item("cv_splits")
+        self.models_to_run = dc.get_item('models_to_run')
+        for m in self.models_to_run:
+            model = m[1]['model']
+            features = m[1]['feature_col_names'] # what about nltk n-grams?
+            labels_to_predict = m[1]['y_label']
+            for l in labels_to_predict:
+                m_name = m[0] + '_' + l
+                for s in splits:
+                    train_idx, test_idx = s
+                    cv_data = dc.get_item('data')
+                    cv_data = cv_data.copy()
+                    cv_data_pk = cv_data[primary_key]
+                    cv_data_X = cv_data[features]
+                    cv_data_y = cv_data[l]
+                    # map data to CV partitions
+                    cv_data_primary_key = cv_data_pk.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
+                    cv_data_train_X = cv_data_X.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
+                    cv_data_train_y = cv_data_y.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
+                    cv_data_test_X = cv_data_X.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
+                    cv_data_test_y = cv_data_y.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
+                    mt_stage = ModelTrainingStage(m_name, model, cv_data_primary_key, cv_data_train_X, cv_data_train_y, cv_data_test_X, cv_data_test_y)
+                    self.addStage(mt_stage)
+                # self.addStage(ModelEvaluationStage(m_name))
+        self._pipeline.setInput(dc)
+        self._pipeline.execute()
+        dc = self._pipeline.getOutput()
         self._outputData = dc
         return

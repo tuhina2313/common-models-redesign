@@ -6,9 +6,10 @@ from stage_base import StageBase
 import dask.dataframe as dd
 
 class CSVReader(StageBase):
-    def __init__(self, data_dir, file_name):
+    def __init__(self, data_dir, file_name, primary_key):
         # TODO: Way to handle directory with multiple files
         self.data_path = "{}/{}".format(data_dir.rstrip('/'), file_name)
+        self.primary_key = primary_key
         super().__init__()
 
     def execute(self):
@@ -17,8 +18,13 @@ class CSVReader(StageBase):
             self.logError("File path does not exist: {}".format(self.data_path))
         dc = DataContainer()
         dc.set_item('data filepath', self.data_path)
-        tmp = dd.read_csv(self.data_path)
-        dc.set_item('data', tmp)
+        df = dd.read_csv(self.data_path)
+        if self.primary_key not in df.columns:
+            message = "Primary key {} not present in {}".format(self.primary_key, self.data_path)
+            self.logError(message)
+            raise ValueError(message)
+        dc.set_item('data', df)
+        dc.set_item('primary_key', self.primary_key)
         self._outputData = dc
         return
 

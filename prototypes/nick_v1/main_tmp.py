@@ -17,7 +17,8 @@ if __name__=='__main__':
         # init dataloader stage
         data_dir = '../../sample_data'
         filename = 'iris_data_w_nans.csv'
-        s0 = CSVReader(data_dir, filename)
+        primary_key = 'super_secret_index'
+        s0 = CSVReader(data_dir, filename, primary_key)
         
         # model initializer
         s1 = ModelInitializer()
@@ -65,8 +66,8 @@ if __name__=='__main__':
         dc = p.getOutput()
         data = dc.get_item('data')
         data = data.compute()
-        results = dc.get_item('m_1_accuracy')
-        preds = dc.get_item('m_1_predictions')
+        #results = dc.get_item('m_1_accuracy')
+        preds = dc.get_item('m_1_species_predictions')
     except Exception as e:
         print(e)
         client.close()
