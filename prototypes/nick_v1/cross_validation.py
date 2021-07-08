@@ -4,12 +4,13 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
 from stage_base import StageBase
 from pipeline import Pipeline
 from dask_ml.model_selection import KFold
-import dask.dataframe 
 
-# testing
+
 import joblib
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import roc_auc_score, accuracy_score
+
+import numpy as np
 
 import pdb
 
@@ -55,10 +56,9 @@ class GenerateCVFolds(StageBase):
 
 
 class CrossValidationStage(StageBase):
-    def __init__(self, models_to_run, labels_to_predict):
+    def __init__(self):
         # TODO: make models_to_run generator function
-        self.models_to_run = [(RandomForestClassifier(), ['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)'])]
-        self.labels_to_predict = ['species']
+        self.models_to_run = None
         self._pipeline = Pipeline()
         super().__init__()
         self._pipeline.setLoggingPrefix('CrossValidationStage: ')
@@ -70,12 +70,15 @@ class CrossValidationStage(StageBase):
     def execute(self):
         dc = self._inputData
         splits = dc.get_item("cv_splits")
+        self.models_to_run = dc.get_item('models_to_run')
         for m in self.models_to_run:
-            model = m[0]
-            features = m[1] # what about nltk n-grams?
-            for l in self.labels_to_predict:
+            m_name = m[0]
+            model = m[1]['model']
+            features = m[1]['feature_col_names'] # what about nltk n-grams?
+            labels_to_predict = m[1]['y_label']
+            for l in labels_to_predict:
                 results = []
-                predictions = []
+                predictions = np.array([])
                 for s in splits:
                     train_idx, test_idx = s
                     cv_data = dc.get_item('data')
@@ -91,9 +94,10 @@ class CrossValidationStage(StageBase):
                     with joblib.parallel_backend('dask'):
                         fitted_model = model.fit(cv_data_train_X, cv_data_train_y)
                         y_preds = fitted_model.predict(cv_data_test_X)
-                        predictions.append(y_preds)
+                        predictions = np.append(predictions, y_preds)
                         results.append(accuracy_score(cv_data_test_y, y_preds))
-            dc.set_item('model_' + str(self.models_to_run.index(m) + 1) + '_accuracy', results)
+            dc.set_item(m_name + '_accuracy', results)
+            dc.set_item(m_name + '_predictions', predictions)
             # write out predictions here
         self._outputData = dc
         return

@@ -2,6 +2,10 @@ from load_data import CSVReader
 from preprocessing import ImputeMissingVals, FeatureScaler, EncodeLabels
 from pipeline import Pipeline
 from cross_validation import GenerateCVFolds, CrossValidationStage
+from model_init import ModelInitializer
+
+
+from sklearn.ensemble import RandomForestClassifier
 
 from dask.distributed import Client
 
@@ -13,7 +17,17 @@ if __name__=='__main__':
         # init dataloader stage
         data_dir = '../../sample_data'
         filename = 'iris_data_w_nans.csv'
-        s1 = CSVReader(data_dir, filename)
+        s0 = CSVReader(data_dir, filename)
+        
+        # model initializer
+        s1 = ModelInitializer()
+        s1.add_model(
+            model=RandomForestClassifier(),
+            model_params={'n_estimators': [100],},
+            feature_col_names=['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)'],
+            y_label=['species'],
+            scoring_func='roc_auc'
+            )
         
         # Column declaration stage? i.e. list of features, labels to predict
         
@@ -34,10 +48,11 @@ if __name__=='__main__':
         s5 = GenerateCVFolds(strategy='random', strategy_args=[1,2,3])
         
         # Cross validation
-        s6 = CrossValidationStage('models_to_run_arg', 'labels_to_predict_arg')
+        s6 = CrossValidationStage()
         
         
         p = Pipeline()
+        p.addStage(s0)
         p.addStage(s1)
         p.addStage(s2)
         p.addStage(s3)
@@ -50,7 +65,8 @@ if __name__=='__main__':
         dc = p.getOutput()
         data = dc.get_item('data')
         data = data.compute()
-        results = dc.get_item('model_1_accuracy')
+        results = dc.get_item('m_1_accuracy')
+        preds = dc.get_item('m_1_predictions')
     except Exception as e:
         print(e)
         client.close()
