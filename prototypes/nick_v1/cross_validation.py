@@ -118,7 +118,6 @@ class CrossValidationStage(StageBase):
         
     def execute(self):
         dc = self._inputData
-        primary_key = dc.get_item('primary_key')
         splits = dc.get_item("cv_splits")
         self.models_to_run = dc.get_item('models_to_run')
         for m in self.models_to_run:
@@ -131,17 +130,17 @@ class CrossValidationStage(StageBase):
                     train_idx, test_idx = s
                     cv_data = dc.get_item('data')
                     cv_data = cv_data.copy()
-                    cv_data_pk = cv_data[primary_key]
                     cv_data_X = cv_data[features]
                     cv_data_y = cv_data[l]
                     # map data to CV partitions
-                    cv_data_primary_key = cv_data_pk.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
                     cv_data_train_X = cv_data_X.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
                     cv_data_train_y = cv_data_y.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
                     cv_data_test_X = cv_data_X.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
                     cv_data_test_y = cv_data_y.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
-                    mt_stage = ModelTrainingStage(m_name, model, cv_data_primary_key, cv_data_train_X, cv_data_train_y, cv_data_test_X, cv_data_test_y)
+                    mt_stage = ModelTrainingStage(m_name, model, s, cv_data_train_X, cv_data_train_y, cv_data_test_X, cv_data_test_y)
                     self.addStage(mt_stage)
+                    # pass in s (cv splits) to model training stage for 
+                    #  bookkeeping
                 # self.addStage(ModelEvaluationStage(m_name))
         self._pipeline.setInput(dc)
         self._pipeline.execute()

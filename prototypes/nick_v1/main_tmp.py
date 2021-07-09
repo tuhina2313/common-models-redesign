@@ -17,8 +17,7 @@ if __name__=='__main__':
         # init dataloader stage
         data_dir = '../../sample_data'
         filename = 'iris_data_w_nans.csv'
-        primary_key = 'super_secret_index'
-        s0 = CSVReader(data_dir, filename, primary_key)
+        s0 = CSVReader(data_dir, filename)
         
         # model initializer
         s1 = ModelInitializer()
