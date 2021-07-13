@@ -12,8 +12,6 @@ from sklearn.metrics import accuracy_score
 
 import numpy as np
 
-import pdb
-
 class GenerateCVFolds(StageBase):
     def __init__(self, strategy, strategy_args):
         self.strategy = strategy.lower()
@@ -45,12 +43,11 @@ class GenerateCVFolds(StageBase):
         kf = KFold(n_splits=5, shuffle=True, random_state=42)
         return kf.split(data)
     
-    def execute(self):
-        dc = self._inputData
+    def execute(self, dc):
         X = dc.get_item('data')
         splits = self._generate_splits(X.to_dask_array(lengths=True))
         dc.set_item('cv_splits', splits)
-        self._outputData = dc
+        return dc
 
 
 
@@ -67,8 +64,7 @@ class CrossValidationStage_dep(StageBase):
     def addStage(self, stage):
         self._pipeline.addStage(stage)
 
-    def execute(self):
-        dc = self._inputData
+    def execute(self, dc):
         splits = dc.get_item("cv_splits")
         self.models_to_run = dc.get_item('models_to_run')
         for m in self.models_to_run:
@@ -77,6 +73,7 @@ class CrossValidationStage_dep(StageBase):
             features = m[1]['feature_col_names'] # what about nltk n-grams?
             labels_to_predict = m[1]['y_label']
             for l in labels_to_predict:
+                l_name = l
                 results = []
                 predictions = np.array([])
                 for s in splits:
@@ -96,11 +93,10 @@ class CrossValidationStage_dep(StageBase):
                         y_preds = fitted_model.predict(cv_data_test_X)
                         predictions = np.append(predictions, y_preds)
                         results.append(accuracy_score(cv_data_test_y, y_preds))
-            dc.set_item(m_name + '_accuracy', results)
-            dc.set_item(m_name + '_predictions', predictions)
+            dc.set_item(m_name + '_' + l_name + '_accuracy', results)
+            dc.set_item(m_name + '_' + l_name + '_predictions', predictions)
             # write out predictions here
-        self._outputData = dc
-        return
+        return dc
 
 
 
@@ -116,8 +112,7 @@ class CrossValidationStage(StageBase):
     def addStage(self, stage):
         self._pipeline.addStage(stage)
         
-    def execute(self):
-        dc = self._inputData
+    def execute(self, dc):
         splits = dc.get_item("cv_splits")
         self.models_to_run = dc.get_item('models_to_run')
         for m in self.models_to_run:
@@ -141,9 +136,7 @@ class CrossValidationStage(StageBase):
                     self.addStage(mt_stage)
                     # pass in s (cv splits) to model training stage for 
                     #  bookkeeping
+                #dc.set_item(m_name + '_accuracy', results)
+                dc.set_item(m_name + '_predictions', predictions)
                 # self.addStage(ModelEvaluationStage(m_name))
-        self._pipeline.setInput(dc)
-        self._pipeline.execute()
-        dc = self._pipeline.getOutput()
-        self._outputData = dc
-        return
+        return dc

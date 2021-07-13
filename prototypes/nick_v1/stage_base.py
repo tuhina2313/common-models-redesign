@@ -26,21 +26,8 @@ class StageBase(ABC):
     def setCached(self, enableCaching):
         self._enableCaching = False #enableCaching
 
-    def setInput(self, inputData):
-        Logger.getInst().info(self._loggingPrefix+type(self).__name__+": Receiving input of type "+type(inputData).__name__)
-        self._inputData = inputData
-        return
-
-    def getOutput(self):
-        if not self._outputData:
-            Logger.getInst().error(self._loggingPrefix+type(self).__name__+": getOutput() called but self._output was not set at the end of execute()")
-        Logger.getInst().info(self._loggingPrefix+type(self).__name__+": Outputting data")
-        #if self._enableCaching:
-        #    mem.cache(self._output)
-        return self._outputData
-
-    # This function should use self._inputData and save the output to self._output
-    # ^ Can we enforce this in the base class somehow?
+    # This function receives an object (dc) of type DataContainer which should be used
+    # for input and output
     @abstractmethod
-    def execute(self):
+    def execute(self, dc):
         pass
