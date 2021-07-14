@@ -1,12 +1,17 @@
-from load_data import CSVReader
-from preprocessing import ImputeMissingVals, FeatureScaler, EncodeLabels
-from pipeline import Pipeline
-from cross_validation import GenerateCVFolds, CrossValidationStage_dep
-from model_init import ModelInitializer
+import os
+import sys
 
 from sklearn.ensemble import RandomForestClassifier
 
 from dask.distributed import Client
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
+from load_data import CSVReader
+from preprocessing import ImputeMissingVals, FeatureScaler, EncodeLabels
+from pipeline import Pipeline
+from cross_validation import GenerateCVFolds, CrossValidationStage
+from model_init import ModelInitializer
+from evaluation_stage import EvaluationStage
 
 def RunTmp():
     try:
@@ -44,8 +49,9 @@ def RunTmp():
         s5 = GenerateCVFolds(strategy='random', strategy_args=[1,2,3])
 
         # Cross validation
-        s6 = CrossValidationStage_dep()
+        s6 = CrossValidationStage()
 
+        s7 = EvaluationStage(method='accuracy')
 
         p = Pipeline()
         p.addStage(s0)
@@ -55,14 +61,15 @@ def RunTmp():
         p.addStage(s4)
         p.addStage(s5)
         p.addStage(s6)
+        p.addStage(s7)
         p.run()
 
         # TESTING
         dc = p.getDC()
         data = dc.get_item('data')
         data = data.compute()
-        results = dc.get_item('m_1_species_accuracy')
         preds = dc.get_item('m_1_species_predictions')
+        results = dc.get_item('m_1_species_evaluation')
         print("Results: " + str(results))
     except Exception as e:
         print(e)

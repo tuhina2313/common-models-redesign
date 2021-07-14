@@ -52,7 +52,7 @@ class GenerateCVFolds(StageBase):
 
 
 
-class CrossValidationStage_dep(StageBase):
+class CrossValidationStage(StageBase):
     def __init__(self):
         # TODO: make models_to_run generator function
         self.models_to_run = None
@@ -67,6 +67,7 @@ class CrossValidationStage_dep(StageBase):
     def execute(self, dc):
         splits = dc.get_item("cv_splits")
         self.models_to_run = dc.get_item('models_to_run')
+        data = dc.get_item('data')
         for m in self.models_to_run:
             m_name = m[0]
             model = m[1]['model']
@@ -74,33 +75,30 @@ class CrossValidationStage_dep(StageBase):
             labels_to_predict = m[1]['y_label']
             for l in labels_to_predict:
                 l_name = l
-                results = []
-                predictions = np.array([])
+                predictions = np.zeros((len(data.index),1)) # TODO - handle non numeric types and use Dask
                 for s in splits:
                     train_idx, test_idx = s
-                    cv_data = dc.get_item('data')
-                    cv_data = cv_data.copy()
-                    cv_data_X = cv_data[features]
-                    cv_data_y = cv_data[l]
+                    #data = data.copy()
+                    data_X = data[features]
+                    data_y = data[l]
                     # map data to CV partitions
-                    cv_data_train_X = cv_data_X.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
-                    cv_data_train_y = cv_data_y.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
-                    cv_data_test_X = cv_data_X.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
-                    cv_data_test_y = cv_data_y.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
+                    data_train_X = data_X.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
+                    data_train_y = data_y.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
+                    data_test_X = data_X.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
+                    data_test_y = data_y.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
                     # fit model
                     with joblib.parallel_backend('dask'):
-                        fitted_model = model.fit(cv_data_train_X, cv_data_train_y)
-                        y_preds = fitted_model.predict(cv_data_test_X)
-                        predictions = np.append(predictions, y_preds)
-                        results.append(accuracy_score(cv_data_test_y, y_preds))
-            dc.set_item(m_name + '_' + l_name + '_accuracy', results)
-            dc.set_item(m_name + '_' + l_name + '_predictions', predictions)
-            # write out predictions here
+                        fitted_model = model.fit(data_train_X, data_train_y)
+                        y_preds = fitted_model.predict(data_test_X)
+                        predictions[test_idx.compute(),0] = y_preds
+                # write out predictions here
+                dc.set_item(m_name + '_' + l_name + '_predictions', predictions)
         return dc
 
 
 
-class CrossValidationStage(StageBase):
+# TODO: This does not tune hyperparameters yet and shouldn't be used until it's implemented 
+class NestedCrossValidationStage(StageBase):
     def __init__(self):
         # TODO: make models_to_run generator function
         self.models_to_run = None
