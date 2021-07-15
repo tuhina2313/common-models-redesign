@@ -52,3 +52,31 @@ class ModelTrainingStage(StageBase):
         return
 
 
+
+class NNModelTrainingStage(StageBase):
+    def __init__(self):
+        self.m_name = 'NN_mnist_fashion'
+        self.model = None
+        self.train_X = None
+        self.train_y = None
+        self.test_X = None
+        self.test_y = None
+        self.validation_data = None
+        self.epochs = 30
+        super().__init__()
+        
+    def execute(self):
+        dc = self._inputData
+        self.model = dc.get_item("models_to_run")
+        self.model = self.model[0]
+        data = dc.get_item("fashion_mnist_data")
+        self.train_X = data["X_train"]
+        self.train_y = data["y_train"]
+        self.test_X = data["X_test"]
+        self.test_y = data["y_test"]
+        self.validation_data = (data["X_valid"], data["y_valid"])
+        
+        history = self.model.fit(self.train_X, self.train_y, epochs=self.epochs, validation_data=self.validation_data)
+        y_pred = self.model.predict_classes(self.test_X)
+        dc.set_item('y_preds', y_pred)
+        self._outputData = dc

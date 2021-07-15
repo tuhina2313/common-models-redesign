@@ -40,13 +40,23 @@ class ModelInitializer(StageBase):
         return
 
 
+class NNModelInitializer(ModelInitializer):
+    def __init__(self):
+        super().__init__()
+    
+    def add_model(self, model_build_function):
+        model = model_build_function()
+        self.models_to_run.append(model)
 
-if __name__=='__main__':
-    models = ModelInitializer()
-    models.add_model(
-        model=RandomForestClassifier(),
-        model_params={'n_estimators': [100, 200],},
-        feature_col_names=['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)'],
-        y_label='species',
-        scoring_func='roc_auc'
-        )
+
+
+# testing
+# if __name__=='__main__':
+#     models = ModelInitializer()
+#     models.add_model(
+#         model=RandomForestClassifier(),
+#         model_params={'n_estimators': [100, 200],},
+#         feature_col_names=['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)'],
+#         y_label='species',
+#         scoring_func='roc_auc'
+#         )
