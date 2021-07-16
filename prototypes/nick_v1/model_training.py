@@ -14,6 +14,8 @@ from stage_base import StageBase
 
 import pdb
 
+from scikeras.wrappers import KerasClassifier
+
 class ModelTrainingStage(StageBase):
     def __init__(self, m_name, model, cv_split, train_X, train_y, test_X, test_y):
         self.m_name = m_name
@@ -75,8 +77,8 @@ class NNModelTrainingStage(StageBase):
         self.test_X = data["X_test"]
         self.test_y = data["y_test"]
         self.validation_data = (data["X_valid"], data["y_valid"])
-        
-        history = self.model.fit(self.train_X, self.train_y, epochs=self.epochs, validation_data=self.validation_data)
-        y_pred = self.model.predict_classes(self.test_X)
+        with joblib.parallel_backend('dask'):
+            history = self.model.fit(self.train_X, self.train_y, epochs=self.epochs, validation_data=self.validation_data)
+            y_pred = self.model.predict_classes(self.test_X)
         dc.set_item('y_preds', y_pred)
         self._outputData = dc

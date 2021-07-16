@@ -10,6 +10,7 @@ from stage_base import StageBase
 
 from sklearn.ensemble import RandomForestClassifier
 
+from scikeras.wrappers import KerasClassifier
 
 class ModelInitializer(StageBase):
     def __init__(self):
@@ -45,7 +46,8 @@ class NNModelInitializer(ModelInitializer):
         super().__init__()
     
     def add_model(self, model_build_function):
-        model = model_build_function()
+        #model = model_build_function()
+        model = KerasClassifier(build_fn=model_build_function) # TESTING
         self.models_to_run.append(model)
 
 
