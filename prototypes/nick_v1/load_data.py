@@ -3,6 +3,8 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
 from stage_base import StageBase
 
+from tensorflow import keras
+
 import dask.dataframe as dd
 
 class CSVReader(StageBase):
@@ -18,4 +20,30 @@ class CSVReader(StageBase):
         dc.set_item('data filepath', self.data_path)
         df = dd.read_csv(self.data_path)
         dc.set_item('data', df)
+        return dc
+
+
+
+class LoadFashionMNIST(StageBase):
+    def __init__(self):
+        self.input_dir = "../sample_data/mnist/"
+        super().__init__()
+        
+    def execute(self, dc):
+        self.logInfo("loading fashion_mnist dataset")
+        fashion_mnist = keras.datasets.fashion_mnist
+        (X_train_full, y_train_full), (X_test, y_test) = fashion_mnist.load_data()
+        # make validation set, scale vals to range from 0-1
+        X_valid, X_train = X_train_full[:5000] / 255.0, X_train_full[5000:] / 255.0
+        y_valid, y_train = y_train_full[:5000], y_train_full[5000:]
+        X_test = X_test / 255.0
+        data = {
+            'X_valid': X_valid,
+            'X_train': X_train,
+            'y_valid': y_valid,
+            'y_train': y_train,
+            'X_test': X_test,
+            'y_test': y_test
+            }
+        dc.set_item('fashion_mnist_data', data)
         return dc
