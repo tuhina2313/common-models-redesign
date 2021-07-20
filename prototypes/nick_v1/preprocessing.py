@@ -5,7 +5,6 @@ from stage_base import StageBase
 
 from dask_ml.preprocessing import MinMaxScaler, StandardScaler, OneHotEncoder, LabelEncoder
 from dask_ml.impute import SimpleImputer
-import pdb
 
 class ImputeMissingVals(StageBase):
     def __init__(self, cols, strategy, fill_value=None):
@@ -26,8 +25,7 @@ class ImputeMissingVals(StageBase):
         self.logInfo("Imputer strategy selected as {}".format(strategy))
         return imputers[strategy]
 
-    def execute(self):
-        dc = self._inputData
+    def execute(self, dc):
         imputer = self._get_imputer(self.strategy, self.fill_value)
         self.logInfo("Imputing missing values for columns: {}".format(self.cols))
         X = dc.get_item('data')
@@ -37,9 +35,7 @@ class ImputeMissingVals(StageBase):
         imputed_cols.compute()
         X[self.cols] = imputed_cols
         dc.set_item('data', X)
-        self._outputData = dc
-        return
-
+        return dc
 
 
 class FeatureScaler(StageBase):
@@ -59,8 +55,7 @@ class FeatureScaler(StageBase):
         self.logInfo("Scaler strategy selected as {}".format(strategy))
         return scalers[strategy]
 
-    def execute(self):
-        dc = self._inputData
+    def execute(self, dc):
         scaler = self._get_scaler(self.strategy, self.feature_range)
         self.logInfo("Scaling values for columns: {}".format(self.cols))
         X = dc.get_item('data')
@@ -70,8 +65,7 @@ class FeatureScaler(StageBase):
         scaled_cols.compute()
         X[self.cols] = scaled_cols
         dc.set_item('data', X)
-        self._outputData = dc
-        return
+        return dc
     
     
     
@@ -109,13 +103,10 @@ class EncodeLabels(StageBase):
         self.logInfo("Encoder strategy selected as {}".format(strategy))
         return encoders[strategy]
             
-    def execute(self):
-        dc = self._inputData
+    def execute(self, dc):
         self.logInfo("Encoding labels for columns: {}".format(self.cols))
         X = dc.get_item('data')
         encoder = self._get_encoder(self.strategy)
-        #pdb.set_trace()
         X = encoder(X, self.cols)
         dc.set_item('data', X)
-        self._outputData = dc
-        return
+        return dc

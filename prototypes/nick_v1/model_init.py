@@ -39,12 +39,10 @@ class ModelInitializer(StageBase):
     def get_models(self):
         return self.models_to_run
     
-    def execute(self):
-        dc = self._inputData
+    def execute(self, dc):
         models = self.get_models()
         dc.set_item('models_to_run', models)
-        self._outputData = dc
-        return
+        return dc
 
 
 class NNModelInitializer(ModelInitializer):
@@ -55,6 +53,7 @@ class NNModelInitializer(ModelInitializer):
         #model = model_build_function()
         model = KerasClassifier(build_fn=model_build_function) # TESTING
         self.models_to_run.append(model)
+
 
 
 

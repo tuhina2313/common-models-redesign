@@ -12,8 +12,6 @@ from sklearn.metrics import accuracy_score
 
 import numpy as np
 
-import pdb
-
 class GenerateCVFolds(StageBase):
     def __init__(self, strategy, strategy_args):
         self.strategy = strategy.lower()
@@ -45,62 +43,12 @@ class GenerateCVFolds(StageBase):
         kf = KFold(n_splits=5, shuffle=True, random_state=42)
         return kf.split(data)
     
-    def execute(self):
-        dc = self._inputData
+    def execute(self, dc):
         X = dc.get_item('data')
         splits = self._generate_splits(X.to_dask_array(lengths=True))
         dc.set_item('cv_splits', splits)
-        self._outputData = dc
+        return dc
 
-
-
-
-class CrossValidationStage_dep(StageBase):
-    def __init__(self):
-        # TODO: make models_to_run generator function
-        self.models_to_run = None
-        self._pipeline = Pipeline()
-        super().__init__()
-        self._pipeline.setLoggingPrefix('CrossValidationStage: ')
-        self.setLoggingPrefix('CrossValidationStage: ')
-
-    def addStage(self, stage):
-        self._pipeline.addStage(stage)
-
-    def execute(self):
-        dc = self._inputData
-        splits = dc.get_item("cv_splits")
-        self.models_to_run = dc.get_item('models_to_run')
-        for m in self.models_to_run:
-            m_name = m[0]
-            model = m[1]['model']
-            features = m[1]['feature_col_names'] # what about nltk n-grams?
-            labels_to_predict = m[1]['y_label']
-            for l in labels_to_predict:
-                results = []
-                predictions = np.array([])
-                for s in splits:
-                    train_idx, test_idx = s
-                    cv_data = dc.get_item('data')
-                    cv_data = cv_data.copy()
-                    cv_data_X = cv_data[features]
-                    cv_data_y = cv_data[l]
-                    # map data to CV partitions
-                    cv_data_train_X = cv_data_X.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
-                    cv_data_train_y = cv_data_y.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
-                    cv_data_test_X = cv_data_X.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
-                    cv_data_test_y = cv_data_y.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
-                    # fit model
-                    with joblib.parallel_backend('dask'):
-                        fitted_model = model.fit(cv_data_train_X, cv_data_train_y)
-                        y_preds = fitted_model.predict(cv_data_test_X)
-                        predictions = np.append(predictions, y_preds)
-                        results.append(accuracy_score(cv_data_test_y, y_preds))
-            dc.set_item(m_name + '_accuracy', results)
-            dc.set_item(m_name + '_predictions', predictions)
-            # write out predictions here
-        self._outputData = dc
-        return
 
 
 
@@ -115,9 +63,54 @@ class CrossValidationStage(StageBase):
 
     def addStage(self, stage):
         self._pipeline.addStage(stage)
+
+    def execute(self, dc):
+        splits = dc.get_item("cv_splits")
+        self.models_to_run = dc.get_item('models_to_run')
+        data = dc.get_item('data')
+        for m in self.models_to_run:
+            m_name = m[0]
+            model = m[1]['model']
+            features = m[1]['feature_col_names'] # what about nltk n-grams?
+            labels_to_predict = m[1]['y_label']
+            for l in labels_to_predict:
+                l_name = l
+                predictions = np.zeros((len(data.index),1)) # TODO - handle non numeric types and use Dask
+                for s in splits:
+                    train_idx, test_idx = s
+                    #data = data.copy()
+                    data_X = data[features]
+                    data_y = data[l]
+                    # map data to CV partitions
+                    data_train_X = data_X.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
+                    data_train_y = data_y.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
+                    data_test_X = data_X.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
+                    data_test_y = data_y.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
+                    # fit model
+                    with joblib.parallel_backend('dask'):
+                        fitted_model = model.fit(data_train_X, data_train_y)
+                        y_preds = fitted_model.predict(data_test_X)
+                        predictions[test_idx.compute(),0] = y_preds
+                # write out predictions here
+                dc.set_item(m_name + '_' + l_name + '_predictions', predictions)
+        return dc
+
+
+
+# TODO: This does not tune hyperparameters yet and shouldn't be used until it's implemented 
+class NestedCrossValidationStage(StageBase):
+    def __init__(self):
+        # TODO: make models_to_run generator function
+        self.models_to_run = None
+        self._pipeline = Pipeline()
+        super().__init__()
+        self._pipeline.setLoggingPrefix('CrossValidationStage: ')
+        self.setLoggingPrefix('CrossValidationStage: ')
+
+    def addStage(self, stage):
+        self._pipeline.addStage(stage)
         
-    def execute(self):
-        dc = self._inputData
+    def execute(self, dc):
         splits = dc.get_item("cv_splits")
         self.models_to_run = dc.get_item('models_to_run')
         for m in self.models_to_run:
@@ -141,9 +134,7 @@ class CrossValidationStage(StageBase):
                     self.addStage(mt_stage)
                     # pass in s (cv splits) to model training stage for 
                     #  bookkeeping
+                #dc.set_item(m_name + '_accuracy', results)
+                dc.set_item(m_name + '_predictions', predictions)
                 # self.addStage(ModelEvaluationStage(m_name))
-        self._pipeline.setInput(dc)
-        self._pipeline.execute()
-        dc = self._pipeline.getOutput()
-        self._outputData = dc
-        return
+        return dc
