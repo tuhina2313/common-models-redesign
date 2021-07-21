@@ -17,24 +17,35 @@ class ModelInitializer(StageBase):
         self.models_to_run = []
         super().__init__()
         
-    def add_model(self, model = None, model_params = None, feature_col_names = None, y_label = None, scoring_func = None, model_build_function = None):
-        if model_build_function is None:
-            m = {
-                'model': model,
-                'model_params': model_params,
-                'feature_col_names': feature_col_names,
-                'y_label': y_label,
-                'scoring_func': scoring_func
-                }
-            i = len(self.models_to_run) + 1
-            m_name = "m_{}".format(i)
-            self.models_to_run.append((m_name, m))
-            self.logInfo("appending model {} - {} to model training list".format(m_name, m))
-        
-        if model_build_function is not None:
+    # def add_model(self, model = None, model_params = None, feature_col_names = None, y_label = None, scoring_func = None, model_build_function = None):
+    def add_model(self, params):
+        backend = params['backend']
+        if backend == "sklearn":
+            #todo - check argument logic
+            self.logInfo("checking sklearn model argugments")
+                # {
+                # 'model': model,
+                # 'model_params': model_params,
+                # 'feature_col_names': feature_col_names,
+                # 'y_label': y_label,
+                # 'scoring_func': scoring_func
+                # }
+        elif backend == 'tensorflow':
+            # todo - also check arguments
+            model_build_function = params['model_build_function']
             model = KerasClassifier(build_fn=model_build_function) # TESTING
-            self.models_to_run.append(model)
-    
+            params['model'] = model
+            self.logInfo("checking tensorflow argugments")
+            
+        else:
+            raise ValueError('This backend is not supported. Choose sklearn or tensorflow.')
+        
+        m = params
+        i = len(self.models_to_run) + 1
+        m_name = "m_{}".format(i)
+        self.models_to_run.append((m_name, m))
+        self.logInfo("appending model {} - {} to model training list".format(m_name, m))
+        
     
     def get_models(self):
         return self.models_to_run
@@ -43,17 +54,6 @@ class ModelInitializer(StageBase):
         models = self.get_models()
         dc.set_item('models_to_run', models)
         return dc
-
-
-class NNModelInitializer(ModelInitializer):
-    def __init__(self):
-        super().__init__()
-    
-    def add_model(self, model_build_function):
-        #model = model_build_function()
-        model = KerasClassifier(build_fn=model_build_function) # TESTING
-        self.models_to_run.append(model)
-
 
 
 

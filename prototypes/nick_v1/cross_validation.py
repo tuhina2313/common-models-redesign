@@ -69,7 +69,7 @@ class CrossValidationStage(StageBase):
         self.models_to_run = dc.get_item('models_to_run')
         data = dc.get_item('data')
         for m in self.models_to_run:
-            m_name = m[0]
+            m_name = m['m_name']   #updated up to this line 
             model = m[1]['model']
             features = m[1]['feature_col_names'] # what about nltk n-grams?
             labels_to_predict = m[1]['y_label']

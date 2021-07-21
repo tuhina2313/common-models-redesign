@@ -23,11 +23,14 @@ def RunTmp():
         # model initializer
         s1 = ModelInitializer()
         s1.add_model(
-            model=RandomForestClassifier(),
-            model_params={'n_estimators': [100],},
-            feature_col_names=['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)'],
-            y_label=['species'],
-            scoring_func='roc_auc'
+            {
+            'model': RandomForestClassifier(),
+            'model_params': {'n_estimators': [100],},
+            'feature_col_names': ['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)'],
+            'y_label': ['species'],
+            'scoring_func': 'roc_auc',
+            'backend' : 'sklearn'
+            }
             )
 
         # Column declaration stage? i.e. list of features, labels to predict
