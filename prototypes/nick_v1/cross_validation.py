@@ -69,10 +69,10 @@ class CrossValidationStage(StageBase):
         self.models_to_run = dc.get_item('models_to_run')
         data = dc.get_item('data')
         for m in self.models_to_run:
-            m_name = m['m_name']   #updated up to this line 
-            model = m[1]['model']
-            features = m[1]['feature_col_names'] # what about nltk n-grams?
-            labels_to_predict = m[1]['y_label']
+            m_name = m['m_name']   
+            model = m['model']   
+            features = m['feature_col_names'] # what about nltk n-grams?
+            labels_to_predict = m['y_label'] #updated up to this line
             for l in labels_to_predict:
                 l_name = l
                 predictions = np.zeros((len(data.index),1)) # TODO - handle non numeric types and use Dask
