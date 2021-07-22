@@ -31,11 +31,6 @@ def RunTmp():
             'scoring_func': 'roc_auc',
             'backend' : 'sklearn'
             }
-        )
-            'y_label': ['species'],
-            'scoring_func': 'roc_auc',
-            'backend' : 'sklearn'
-            }
             )
 
         # Column declaration stage? i.e. list of features, labels to predict
@@ -83,18 +78,10 @@ def RunTmp():
     except Exception as e:
         print(e)
     
-    return 
-        preds = dc.get_item('m_1_species_predictions')
-        results = dc.get_item('m_1_species_evaluation')
-        print("Results: " + str(results))
-    except Exception as e:
-        print(e)
-    
     return
 
 if __name__=='__main__':
     __spec__ = "None" # BB - for compatibility when running with pdb debugger
     client = Client(n_workers=4)
     dc = RunTmp()
-    RunTmp()
     client.close()

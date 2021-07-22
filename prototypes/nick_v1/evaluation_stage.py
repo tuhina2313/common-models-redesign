@@ -29,7 +29,6 @@ class EvaluationStage(StageBase):
             y_labels = params['y_labels']
             tmp = [(model,y) for y in y_labels]
             model_and_labels = model_and_labels + tmp
-        model_and_labels = [(m[1]['model'], label_name) for m in dc.get_item('models_to_run') for label_name in m[1]['y_label']]
         data = dc.get_item('data')
         for model, label_name in model_and_labels:
             label = data[label_name]

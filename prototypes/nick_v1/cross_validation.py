@@ -83,13 +83,6 @@ class CrossValidationStage(StageBase):
                 l_name = l
                 predictions = np.zeros((len(data.index),1)) # TODO - handle non numeric types and use Dask
                 cv_counter = 0
-            m_name = m['m_name']   
-            model = m['model']   
-            features = m['feature_col_names'] # what about nltk n-grams?
-            labels_to_predict = m['y_label'] #updated up to this line
-            for l in labels_to_predict:
-                l_name = l
-                predictions = np.zeros((len(data.index),1)) # TODO - handle non numeric types and use Dask
                 for s in splits:
                     cv_counter += 1
                     self.logInfo("Running CV for fold {}".format(cv_counter))
