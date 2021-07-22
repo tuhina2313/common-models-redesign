@@ -17,10 +17,9 @@ from scikeras.wrappers import KerasClassifier
 
 
 class ModelTrainingStage(StageBase):
-    def __init__(self, m_name, model, cv_split, train_X, train_y, test_X, test_y):
+    def __init__(self, m_name, model, train_X, train_y, test_X, test_y):
         self.m_name = m_name
         self.model = model
-        self.cv_split = cv_split
         self.train_X = train_X
         self.train_y = train_y
         self.test_X = test_X
