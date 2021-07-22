@@ -6,6 +6,7 @@ from stage_base import StageBase
 from dask_ml.preprocessing import MinMaxScaler, StandardScaler, OneHotEncoder, LabelEncoder
 from dask_ml.impute import SimpleImputer
 
+
 class ImputeMissingVals(StageBase):
     def __init__(self, cols, strategy, fill_value=None):
         self.cols = cols

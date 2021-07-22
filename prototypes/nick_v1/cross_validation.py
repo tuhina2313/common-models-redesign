@@ -12,6 +12,7 @@ from sklearn.metrics import accuracy_score
 
 import numpy as np
 
+
 class GenerateCVFolds(StageBase):
     def __init__(self, strategy, strategy_args):
         self.strategy = strategy.lower()
@@ -40,10 +41,11 @@ class GenerateCVFolds(StageBase):
     #     return strategy_checks[self.strategy](self.strategy_args)
         
     def _generate_splits(self, data):
-        kf = KFold(n_splits=5, shuffle=True, random_state=42)
+        kf = KFold(n_splits=5, shuffle=False, random_state=42)
         return kf.split(data)
     
     def execute(self, dc):
+        self.logInfo("Generating CV Folds")
         X = dc.get_item('data')
         splits = self._generate_splits(X.to_dask_array(lengths=True))
         dc.set_item('cv_splits', splits)
@@ -65,10 +67,22 @@ class CrossValidationStage(StageBase):
         self._pipeline.addStage(stage)
 
     def execute(self, dc):
+        self.logInfo("Starting Cross-Validation Stage")
         splits = dc.get_item("cv_splits")
         self.models_to_run = dc.get_item('models_to_run')
         data = dc.get_item('data')
         for m in self.models_to_run:
+            m_name = [k for k in m.keys()][0] 
+            model_params = m[m_name]['params']
+            model = model_params['model']   
+            features = model_params['feature_col_names'] # what about nltk n-grams?
+            labels_to_predict = model_params['y_labels'] 
+            backend = model_params['backend']
+            for l in labels_to_predict:
+                self.logInfo("Starting CV for {} for label {}".format(m_name, l))
+                l_name = l
+                predictions = np.zeros((len(data.index),1)) # TODO - handle non numeric types and use Dask
+                cv_counter = 0
             m_name = m['m_name']   
             model = m['model']   
             features = m['feature_col_names'] # what about nltk n-grams?
@@ -77,6 +91,8 @@ class CrossValidationStage(StageBase):
                 l_name = l
                 predictions = np.zeros((len(data.index),1)) # TODO - handle non numeric types and use Dask
                 for s in splits:
+                    cv_counter += 1
+                    self.logInfo("Running CV for fold {}".format(cv_counter))
                     train_idx, test_idx = s
                     #data = data.copy()
                     data_X = data[features]
@@ -116,7 +132,7 @@ class NestedCrossValidationStage(StageBase):
         for m in self.models_to_run:
             model = m[1]['model']
             features = m[1]['feature_col_names'] # what about nltk n-grams?
-            labels_to_predict = m[1]['y_label']
+            labels_to_predict = m[1]['y_labels']
             for l in labels_to_predict:
                 m_name = m[0] + '_' + l
                 for s in splits:

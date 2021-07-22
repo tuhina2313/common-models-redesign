@@ -22,28 +22,29 @@ class ModelInitializer(StageBase):
         backend = params['backend']
         if backend == "sklearn":
             #todo - check argument logic
-            self.logInfo("checking sklearn model argugments")
-                # {
-                # 'model': model,
-                # 'model_params': model_params,
-                # 'feature_col_names': feature_col_names,
-                # 'y_label': y_label,
-                # 'scoring_func': scoring_func
-                # }
+            self.logInfo("checking sklearn model arguments")
+            
+
         elif backend == 'tensorflow':
             # todo - also check arguments
             model_build_function = params['model_build_function']
             model = KerasClassifier(build_fn=model_build_function) # TESTING
             params['model'] = model
-            self.logInfo("checking tensorflow argugments")
-            
+            self.logInfo("checking tensorflow arguments")
+
         else:
             raise ValueError('This backend is not supported. Choose sklearn or tensorflow.')
         
         m = params
         i = len(self.models_to_run) + 1
-        m_name = "m_{}".format(i)
-        self.models_to_run.append((m_name, m))
+        m_name = "model_{}".format(i)
+        diception_mobject = {
+            m_name: {
+                "params": m,
+                "output": {},
+                }
+            }
+        self.models_to_run.append(diception_mobject)
         self.logInfo("appending model {} - {} to model training list".format(m_name, m))
         
     

@@ -16,6 +16,19 @@ class EvaluationStage(StageBase):
         super().__init__()
 
     def execute(self, dc):
+        self.logInfo("Running Model Evaluation Stage")
+        #model_and_labels = [(m[1]['model'], label_name) for m in dc.get_item('models_to_run') for label_name in m[1]['y_label']]
+        model_and_labels = []
+        models_to_run = dc.get_item('models_to_run')
+        #model_names = [[k for k in x.keys()][0] for x in models_to_run]
+        #print(model_names)
+        for m in models_to_run:
+            name = [k for k in m.keys()][0]
+            params = m[name]['params']
+            model = params['model']
+            y_labels = params['y_labels']
+            tmp = [(model,y) for y in y_labels]
+            model_and_labels = model_and_labels + tmp
         model_and_labels = [(m[1]['model'], label_name) for m in dc.get_item('models_to_run') for label_name in m[1]['y_label']]
         data = dc.get_item('data')
         for model, label_name in model_and_labels:

@@ -27,6 +27,11 @@ def RunTmp():
             'model': RandomForestClassifier(),
             'model_params': {'n_estimators': [100],},
             'feature_col_names': ['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)'],
+            'y_labels': ['species'],
+            'scoring_func': 'roc_auc',
+            'backend' : 'sklearn'
+            }
+        )
             'y_label': ['species'],
             'scoring_func': 'roc_auc',
             'backend' : 'sklearn'
@@ -71,6 +76,14 @@ def RunTmp():
         dc = p.getDC()
         data = dc.get_item('data')
         data = data.compute()
+        preds = dc.get_item('model_1_species_predictions')
+        results = dc.get_item('model_1_species_evaluation')
+        print("Results: " + str(results))
+        return dc
+    except Exception as e:
+        print(e)
+    
+    return 
         preds = dc.get_item('m_1_species_predictions')
         results = dc.get_item('m_1_species_evaluation')
         print("Results: " + str(results))
@@ -82,5 +95,6 @@ def RunTmp():
 if __name__=='__main__':
     __spec__ = "None" # BB - for compatibility when running with pdb debugger
     client = Client(n_workers=4)
+    dc = RunTmp()
     RunTmp()
     client.close()
