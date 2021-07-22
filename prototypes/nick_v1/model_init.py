@@ -24,13 +24,14 @@ class ModelInitializer(StageBase):
             #todo - check argument logic
             self.logInfo("checking sklearn model arguments")
             
+
         elif backend == 'tensorflow':
             # todo - also check arguments
             model_build_function = params['model_build_function']
             model = KerasClassifier(build_fn=model_build_function) # TESTING
             params['model'] = model
             self.logInfo("checking tensorflow arguments")
-            
+
         else:
             raise ValueError('This backend is not supported. Choose sklearn or tensorflow.')
         
@@ -54,7 +55,6 @@ class ModelInitializer(StageBase):
         models = self.get_models()
         dc.set_item('models_to_run', models)
         return dc
-
 
 
 

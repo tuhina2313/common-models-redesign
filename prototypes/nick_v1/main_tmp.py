@@ -32,6 +32,11 @@ def RunTmp():
             'backend' : 'sklearn'
             }
         )
+            'y_label': ['species'],
+            'scoring_func': 'roc_auc',
+            'backend' : 'sklearn'
+            }
+            )
 
         # Column declaration stage? i.e. list of features, labels to predict
 
@@ -41,7 +46,7 @@ def RunTmp():
         s3 = FeatureScaler(cols, 'min-max')
         categorical_cols = ['species']
         s4 = EncodeLabels(categorical_cols, 'labelencoder')
-        
+
         # cross-validation
         # TESTING
         #cv_strategy = CrossValidationStrategy(strategy='random', strategy_args=(train_test_splits=8, train_val_splits=3, groupby=['TeacherID']))
@@ -79,9 +84,17 @@ def RunTmp():
         print(e)
     
     return 
+        preds = dc.get_item('m_1_species_predictions')
+        results = dc.get_item('m_1_species_evaluation')
+        print("Results: " + str(results))
+    except Exception as e:
+        print(e)
+    
+    return
 
 if __name__=='__main__':
     __spec__ = "None" # BB - for compatibility when running with pdb debugger
     client = Client(n_workers=4)
     dc = RunTmp()
+    RunTmp()
     client.close()
