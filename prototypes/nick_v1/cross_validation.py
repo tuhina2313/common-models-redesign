@@ -97,9 +97,13 @@ class CrossValidationStage(StageBase):
                     data_test_y = data_y.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
                     # fit model
                     with joblib.parallel_backend('dask'):
-                        fitted_model = model.fit(data_train_X, data_train_y)
-                        y_preds = fitted_model.predict(data_test_X)
-                        predictions[test_idx.compute(),0] = y_preds
+                        if backend == 'sklearn':
+                            fitted_model = model.fit(data_train_X, data_train_y)
+                            y_preds = fitted_model.predict(data_test_X)
+                            predictions[test_idx.compute(),0] = y_preds
+                        elif backend == 'tensorflow':
+                            history = self.model.fit(self.train_X, self.train_y, epochs=self.epochs)
+                            y_pred = self.model.predict_classes(self.test_X)
                 # write out predictions here
                 dc.set_item(m_name + '_' + l_name + '_predictions', predictions)
         return dc
