@@ -4,6 +4,8 @@ from abc import ABCMeta, abstractmethod
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'logging'))
 from logger import Logger
 
+from inspect import signature
+
 from sklearn.base import BaseEstimator
 from tensorflow.keras.models import Model
 
@@ -22,9 +24,15 @@ class ModelBase(metaclass=ABCMeta):
 			raise RuntimeError("Models must be finalized prior to getting")
 
 	def set_model_create_fn(self, func):
-		# check that func accepts a single arg for a param dict, else throw an error
-		# if check passes, set local var to the callback function provided (func)
-		pass
+		sig = signature(func)
+		if len(sig.parameters) != 1:
+			raise ValueError("model_create_fn must accept a single argument")
+		param = sig.parameters.values()[0]
+	    if not (param.kind == param.POSITIONAL_ONLY or param.kind == POSITIONAL_OR_KEYWORD): 
+	    	raise ValueError("model_create_fn must have similar prototype to `def func(params):`")
+	    if not (param.default is param.empty):
+	    	raise ValueError("model_create_fn argument cannot have default value")
+	    self._model_create_fn = func
 
 	@abstractmethod
 	def get_params(self, deep=False):
@@ -33,7 +41,7 @@ class ModelBase(metaclass=ABCMeta):
 	def set_params(self, params):
 		self._params = params
 
-	def finalize(self, **kwargs):
+	def finalize(self, params_dict):
 		self._model = self._model_create_fn(self._params)
 		self._finalized = True
 
@@ -81,13 +89,20 @@ class TensorFlowModel(ModelBase):
 	def set_params(self, params):
 		pass
 
-	def finalize(self, **kwargs):
+	def finalize(self, params_dict):
 		super().finalize()
+		keys = params_dict.keys()
+		if not 'loss' in keys:
+			raise ValueError('TensorFlowModel requires `loss` parameter (e.g. "loss":"mse")')
+		if not 'optimizer' in keys:
+			raise ValueError('TensorFlowModel requires `optimizer` parameter (e.g. "optimizer":"sgd")')
+		if not 'metrics' in keys:
+			raise ValueError('TensorFlowModel requires `metrics` parameter (e.g. "metrics":["accuracy"])')
 		try:
-			self._model.compile(kwargs) # check that required parameters exist
+			# catch unexpected errors (e.g. typos)
+			self._model.compile(**params_dict) 
 		except Exception as e:
-			# log e
-			raise RuntimeError("print something meaningful")
+			raise RuntimeError("Failed to compile TensorFlowModel with exception: {}".format(str(e)))
 
 	def fit(self, X, y):
 		super().fit(X,y)

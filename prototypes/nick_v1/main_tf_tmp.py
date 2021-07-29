@@ -29,8 +29,7 @@ def build_model_fashion_mnist():
 
 def build_model_iris():
     model = keras.models.Sequential()
-    #model.add(keras.layers.Flatten(input_shape=[28,28]))
-    model.add(keras.layers.Dense(4, activation="relu"))
+    model.add(keras.layers.InputLayer(input_shape=(4,)))
     model.add(keras.layers.Dense(4, activation="relu"))
     model.add(keras.layers.Dense(3, activation="softmax"))
     model.compile(loss="sparse_categorical_crossentropy",

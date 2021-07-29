@@ -14,7 +14,8 @@ import numpy as np
 
 
 class GenerateCVFolds(StageBase):
-    def __init__(self, strategy, strategy_args):
+    def __init__(self, k_folds, strategy, strategy_args):
+        self.k_folds = k_folds
         self.strategy = strategy.lower()
         self.strategy_args = strategy_args
         super().__init__()
@@ -25,14 +26,9 @@ class GenerateCVFolds(StageBase):
     #     def _check_random_args(args):
     #         # TODO
     #         return True
-            
-    #     def _check_predefined_folds_args(args):
-    #         # TODO
-    #         return True
         
     #     strategy_checks = {
     #         'random': _check_random_args(self.strategy_args),
-    #         'predefined_folds': _check_predefined_folds_args(self.strategy_args),
     #         #'stratified': () TODO
     #         }
         
@@ -41,7 +37,7 @@ class GenerateCVFolds(StageBase):
     #     return strategy_checks[self.strategy](self.strategy_args)
         
     def _generate_splits(self, data):
-        kf = KFold(n_splits=5, shuffle=False, random_state=42)
+        kf = KFold(n_splits=self.k_folds, shuffle=False, random_state=42)
         return kf.split(data)
     
     def execute(self, dc):
