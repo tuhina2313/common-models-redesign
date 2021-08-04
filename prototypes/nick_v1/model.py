@@ -23,16 +23,16 @@ class ModelBase(metaclass=ABCMeta):
 		else:
 			raise RuntimeError("Models must be finalized prior to getting")
 
-	def set_model_create_fn(self, func):
+	def set_model_create_func(self, func):
 		sig = signature(func)
 		if len(sig.parameters) != 1:
 			raise ValueError("model_create_fn must accept a single argument")
-		param = sig.parameters.values()[0]
-	    if not (param.kind == param.POSITIONAL_ONLY or param.kind == POSITIONAL_OR_KEYWORD): 
-	    	raise ValueError("model_create_fn must have similar prototype to `def func(params):`")
-	    if not (param.default is param.empty):
-	    	raise ValueError("model_create_fn argument cannot have default value")
-	    self._model_create_fn = func
+		param = [v for v in sig.parameters.values()][0]
+		if not (param.kind == param.POSITIONAL_ONLY or param.kind == param.POSITIONAL_OR_KEYWORD):
+			raise ValueError("model_create_fn must have similar prototype to `def func(params):`")
+		if not (param.default is param.empty):
+			raise ValueError("model_create_fn argument cannot have default value")
+		self._model_create_fn = func
 
 	@abstractmethod
 	def get_params(self, deep=False):

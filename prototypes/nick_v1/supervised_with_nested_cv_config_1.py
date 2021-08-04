@@ -1,12 +1,12 @@
 from load_data import CSVReader
 from preprocessing import ImputeMissingVals, FeatureScaler, EncodeLabels
 from pipeline import Pipeline
-from cross_validation import GenerateCVFolds, CrossValidationStage
+from cross_validation import GenerateCVFolds, NestedCrossValidationTrainingStage
 from model_training import ModelTrainingStage
 from evaluation_stage import EvaluationStage
 
-from model import SklearnModel, TensorflowModel
-
+from model import SklearnModel, TensorFlowModel
+from training_context import SklearnSupervisedTrainParamGridContext, TensorFlowSupervisedTrainParamGridContext
 
 from dask.distributed import Client
 from sklearn.ensemble import RandomForestClassifier
@@ -34,7 +34,7 @@ def my_tf_model_func(params):
 skm = SklearnModel()
 skm.set_model_create_func(my_sklearn_model_func)
 
-tfm = TensorflowModel()
+tfm = TensorFlowModel()
 tfm.set_model_create_func(my_tf_model_func)
 
 
@@ -49,21 +49,24 @@ s1 = EncodeLabels(categorical_cols, 'labelencoder')
 
 s2 = GenerateCVFolds(k_folds=5, strategy='random', strategy_args={'seed':42}) 
 
-train_context_skm = { # make a class - see below
-    'model': skm,
-    'feature_cols': cols,
-    'labels': categorical_cols,
-    'param_grid': {'n_estimators': [10,100,1000], 'max_depth': [1,10,None]},
-    'cv_eval_func': 'accuracy'
-}
 
-train_context_tfm = { # make a class - see below
-    'model': tfm,
-    'feature_cols': cols,
-    'labels': categorical_cols,
-    'param_grid': {'hidden_layer_size': [3,4,5,6]},
-    'cv_eval_func': 'accuracy'
-}
+# init training context for sklearn supervised model with nested CV params
+train_context_skm = SklearnSupervisedTrainParamGridContext()
+train_context_skm.model = skm
+train_context_skm.feature_cols = cols
+train_context_skm.ylabels = categorical_cols
+train_context_skm.param_grid = {'n_estimators': [10,100,1000], 'max_depth': [1,10,None]}
+train_context_skm.scoring_func = 'accuracy'
+
+# init training context for tensorflow supervised model with nested CV params
+train_context_tfm = TensorFlowSupervisedTrainParamGridContext()
+train_context_tfm.model = tfm
+train_context_tfm.feature_cols = cols
+train_context_tfm.ylabels = categorical_cols
+train_context_tfm.param_grid = {'hidden_layer_size': [3,4,5,6]}
+train_context_tfm.scoring_func = 'accuracy'
+train_context_tfm.optimizer = 'sgd'
+
 
 s3 = NestedCrossValidationTrainingStage(train_context_skm)
 #s3 = NestedCrossValidationTrainingStage(train_context_tfm)  # train one context per pipeline execution

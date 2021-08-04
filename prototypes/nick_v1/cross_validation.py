@@ -15,9 +15,9 @@ import numpy as np
 
 class GenerateCVFolds(StageBase):
     def __init__(self, k_folds, strategy, strategy_args):
-        self.k_folds = k_folds
-        self.strategy = strategy.lower()
-        self.strategy_args = strategy_args
+        self._k_folds = k_folds
+        self._strategy = strategy.lower()
+        self._strategy_args = strategy_args
         super().__init__()
     #    self._check_args()
         
@@ -37,13 +37,19 @@ class GenerateCVFolds(StageBase):
     #     return strategy_checks[self.strategy](self.strategy_args)
         
     def _generate_splits(self, data):
-        kf = KFold(n_splits=self.k_folds, shuffle=False, random_state=42)
+        kf = KFold(n_splits=self._k_folds, shuffle=False, random_state=self._strategy_args['seed'])
         return kf.split(data)
     
     def execute(self, dc):
         self.logInfo("Generating CV Folds")
         X = dc.get_item('data')
-        splits = self._generate_splits(X.to_dask_array(lengths=True))
+        if self._strategy == 'random':
+            splits = self._generate_splits(X.to_dask_array(lengths=True))
+        elif self._strategy == 'stratified':
+            # TODO: Stratified CV Folds
+            raise RuntimeError("Stratified CV Folds not yet implemented")
+        else:
+            raise ValueError("{} is not a supported strategy for GenerateCVFolds".format(self._strategy))
         dc.set_item('cv_splits', splits)
         return dc
 
@@ -107,7 +113,7 @@ class CrossValidationStage(StageBase):
 
 
 # TODO: This does not tune hyperparameters yet and shouldn't be used until it's implemented 
-class NestedCrossValidationStage(StageBase):
+class NestedCrossValidationTrainingStage(StageBase):
     def __init__(self):
         # TODO: make models_to_run generator function
         self.models_to_run = None
