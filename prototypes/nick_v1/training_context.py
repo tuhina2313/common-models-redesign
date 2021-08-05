@@ -6,7 +6,7 @@ from tensorflow.keras.losses import get as get_loss
 from tensorflow.keras.optimizer import get as get_optimizer
 
 from model import ModelBase, SklearnModel, TensorFlowModel
-
+from utils import get_sklearn_scoring_func, get_tensorflow_loss_func, get_tensorflow_metric_func
 
 class TrainPredictContext():
 	def __init__(self):
@@ -64,7 +64,8 @@ class SupervisedTrainParamGridContext(SupervisedTrainPredictContext):
 	def __init__(self):
 		super().__init__()
 		self._param_grid = None
-		self._scoring_func = None
+		self._param_eval_func = None
+		self._param_eval_goal = None
 
 	def get_param_grid(self):
 		return self._param_grid
@@ -75,34 +76,51 @@ class SupervisedTrainParamGridContext(SupervisedTrainPredictContext):
 		else:
 			raise ValueError('param_grid argument must be dict type')
 
-	def get_scoring_func(self):
-		return self._scoring_func
+	def get_param_eval_func(self):
+		return self._param_eval_func
 
-	def set_scoring_func(self, scoring_func):
-		if isinstance(scoring_func, str):
-			# TODO: Utility function to check and return proper scoring function
-			scoring_func = get_scorer(scoring_func)
-			self._scoring_func = scoring_func
-		elif callable(scoring_func):
-			self._scoring_func = scoring_func
+	def set_param_eval_func(self, param_eval_func):
+		if callable(param_eval_func):
+			self._param_eval_func = param_eval_func
 		else:
-			raise ValueError('scoring_func argument must be dict type')
+			raise ValueError('param_eval_func argument must be callable type')
+
+	def get_param_eval_goal(self):
+		return self._param_eval_goal
+
+	def set_param_eval_goal(self, param_eval_goal):
+		param_eval_goal = param_eval_goal.lower()
+		if param_eval_goal not in ['min', 'max']: # TODO: make enum object with min max types
+			raise ValueError('param_eval_goal must be either min or max')
+		self._param_eval_goal = param_eval_goal
 
 	def validate(self):
 		super().validate()
 		if not isinstance(self.param_grid, Mapping):
 			raise TypeError('param_grid must be initialized to Mapping (dict) type')
-		if not callable(self.scoring_func):
-			raise RuntimeError('scoring_func must be initialized to a callable type')
+		if not callable(self.param_eval_func):
+			raise RuntimeError('param_eval_func must be initialized to a callable type')
+		if self.param_eval_goal is None:
+			raise RuntimeError('param_eval_goal must be initialized to min or max') # TODO: Update after enum type
 		return True
 
 	param_grid = property(get_param_grid, set_param_grid)
-	scoring_func = property(get_scoring_func, set_scoring_func)
+	param_eval_func = property(get_param_eval_func, set_param_eval_func)
+	param_eval_goal = property(get_param_eval_goal, set_param_eval_goal)
 
 
 class SklearnSupervisedTrainParamGridContext(SupervisedTrainParamGridContext):
 	def __init__(self):
 		super().__init__()
+
+	def get_param_eval_func(self):
+		return self._param_eval_func
+
+	def set_param_eval_func(self, param_eval_func):
+		if isinstance(param_eval_func, str):
+			self.param_eval_func = get_sklearn_scoring_func(param_eval_func)
+		else:
+			super().set_param_eval_func(param_eval_func)
 
 	def validate(self):
 		super().validate()
@@ -110,10 +128,22 @@ class SklearnSupervisedTrainParamGridContext(SupervisedTrainParamGridContext):
 			raise TypeError("SklearnSupervisedTrainParamGridContext must take SklearnModel type as model arg")
 		return True
 
+	param_eval_func = property(get_param_eval_func, set_param_eval_func)
+
+
 class TensorFlowSupervisedTrainParamGridContext(SupervisedTrainPredictContext):
 	def __init__(self):
 		super().__init__()
 		self._optimizer = None
+
+	def get_param_eval_func(self):
+		return self._param_eval_func
+
+	def set_param_eval_func(self, param_eval_func):
+		if isinstance(param_eval_func, str):
+			self.param_eval_func = get_tensorflow_loss_func(param_eval_func)
+		else:
+			super().set_param_eval_func(param_eval_func)
 
 	def get_optimizer(self):
 		return self._optimizer
@@ -146,6 +176,6 @@ class TensorFlowSupervisedTrainParamGridContext(SupervisedTrainPredictContext):
 		return True
 
 	optimizer = property(get_optimizer, set_optimizer)
-
+	param_eval_func = property(get_param_eval_func, set_param_eval_func)
 
 
