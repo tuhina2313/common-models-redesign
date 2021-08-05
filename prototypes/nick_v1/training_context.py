@@ -1,4 +1,11 @@
-from model import SklearnModel, TensorFlowModel
+from collections.abc import Iterable, Mapping
+
+from dask.dataframe import dataframe as dd
+from sklearn.metrics import get_scorer
+from tensorflow.keras.losses import get as get_loss
+from tensorflow.keras.optimizer import get as get_optimizer
+
+from model import ModelBase, SklearnModel, TensorFlowModel
 
 
 class TrainPredictContext():
@@ -15,14 +22,15 @@ class TrainPredictContext():
 	def get_model(self):
 		return self._model
 
-	def set_model(self, model):
-		# TODO: check that model is SklearnModel or TensorFlowModel type
+	def set_model(self, model:ModelBase):
 		self._model = model
 
 	def validate(self):
-		# TODO: check that cols exist in data
-		# TODO: map column names -- or maybe somewhere else
-		# if checks fail, return False
+		# Column validity checks happen inside the training stage of the pipeline
+		if not isinstance(self.feature_cols, Iterable):
+			raise TypeError("feature_cols must be initialized to Iterable type")
+		if self.model is None:
+			raise RuntimeError("model must be initialized")
 		return True
 
 	feature_cols = property(get_feature_cols, set_feature_cols)
@@ -32,30 +40,30 @@ class TrainPredictContext():
 class SupervisedTrainPredictContext(TrainPredictContext):
 	def __init__(self):
 		super().__init__()
-		self._ylabels = []
+		self._ylabel = None
 
-	def get_ylabels(self):
-		return self._ylabels
+	def get_ylabel(self):
+		return self._ylabel
 
-	def set_ylabels(self, labels):
-		if isinstance(labels, list):
-			self._ylabels = labels
+	def set_ylabel(self, labels):
+		if isinstance(labels, str) or isinstance(labels, Iterable):
+			self._ylabel = labels
 		else:
-			raise ValueError('labels argument must be list type')
+			raise ValueError('labels argument must be Iterable or string type')
 
 	def validate(self):
 		super().validate()
-		# TODO: check that ylabels exist in data
-		# if checks fail, return False
+		if not isinstance(self.ylabel, str) or not isinstance(self.ylabel, Iterable):
+			raise TypeError("ylabel must be initialized to Iterable or string type")
 		return True
 
-	ylabels = property(get_ylabels, set_ylabels)
+	ylabel = property(get_ylabel, set_ylabel)
 
 
 class SupervisedTrainParamGridContext(SupervisedTrainPredictContext):
 	def __init__(self):
 		super().__init__()
-		self._param_grid = {}
+		self._param_grid = None
 		self._scoring_func = None
 
 	def get_param_grid(self):
@@ -72,7 +80,8 @@ class SupervisedTrainParamGridContext(SupervisedTrainPredictContext):
 
 	def set_scoring_func(self, scoring_func):
 		if isinstance(scoring_func, str):
-			# TODO get scorer function w. str arg
+			# TODO: Utility function to check and return proper scoring function
+			scoring_func = get_scorer(scoring_func)
 			self._scoring_func = scoring_func
 		elif callable(scoring_func):
 			self._scoring_func = scoring_func
@@ -81,9 +90,10 @@ class SupervisedTrainParamGridContext(SupervisedTrainPredictContext):
 
 	def validate(self):
 		super().validate()
-		# TODO: check that parameters are valid
-		# TODO: check that scoring func is valid
-		# if checks fail, return False
+		if not isinstance(self.param_grid, Mapping):
+			raise TypeError('param_grid must be initialized to Mapping (dict) type')
+		if not callable(self.scoring_func):
+			raise RuntimeError('scoring_func must be initialized to a callable type')
 		return True
 
 	param_grid = property(get_param_grid, set_param_grid)
@@ -109,8 +119,23 @@ class TensorFlowSupervisedTrainParamGridContext(SupervisedTrainPredictContext):
 		return self._optimizer
 
 	def set_optimizer(self, optimizer):
-		# TODO get optimizer w. str arg
-		self._optimizer = optimizer
+		tf_optimizers = [
+			'adadelta',
+			'adagrad',
+			'adam',
+			'adamax',
+			'nadam',
+			'rmsprop',
+			'sgd',
+			'ftrl',
+			'lossscaleoptimizer',
+			'lossscaleoptimizerv1'
+			]
+		optimizer = optimizer.lower()
+		if optimizer in tf_optimizers:
+			self._optimizer = optimizer
+		else:
+			raise ValueError("optimizer: {} not supported by TensorFlow".format(optimizer))
 
 	def validate(self):
 		super().validate()

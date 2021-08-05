@@ -54,7 +54,7 @@ s2 = GenerateCVFolds(k_folds=5, strategy='random', strategy_args={'seed':42})
 train_context_skm = SklearnSupervisedTrainParamGridContext()
 train_context_skm.model = skm
 train_context_skm.feature_cols = cols
-train_context_skm.ylabels = categorical_cols
+train_context_skm.ylabel = categorical_cols
 train_context_skm.param_grid = {'n_estimators': [10,100,1000], 'max_depth': [1,10,None]}
 train_context_skm.scoring_func = 'accuracy'
 
@@ -62,7 +62,7 @@ train_context_skm.scoring_func = 'accuracy'
 train_context_tfm = TensorFlowSupervisedTrainParamGridContext()
 train_context_tfm.model = tfm
 train_context_tfm.feature_cols = cols
-train_context_tfm.ylabels = categorical_cols
+train_context_tfm.ylabel = categorical_cols
 train_context_tfm.param_grid = {'hidden_layer_size': [3,4,5,6]}
 train_context_tfm.scoring_func = 'accuracy'
 train_context_tfm.optimizer = 'sgd'
