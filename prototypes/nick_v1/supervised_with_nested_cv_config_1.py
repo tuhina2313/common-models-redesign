@@ -57,6 +57,7 @@ train_context_skm.feature_cols = cols
 train_context_skm.ylabel = categorical_cols
 train_context_skm.param_grid = {'n_estimators': [10,100,1000], 'max_depth': [1,10,None]}
 train_context_skm.param_eval_func = 'accuracy'
+train_context_skm.param_eval_goal = 'max'
 
 # init training context for tensorflow supervised model with nested CV params
 train_context_tfm = TensorFlowSupervisedTrainParamGridContext()
@@ -65,13 +66,14 @@ train_context_tfm.feature_cols = cols
 train_context_tfm.ylabel = categorical_cols
 train_context_tfm.param_grid = {'hidden_layer_size': [3,4,5,6]}
 train_context_tfm.param_eval_func = 'accuracy'
+train_context_tfm.param_eval_goal = 'max'
 train_context_tfm.optimizer = 'sgd'
 
 
 s3 = NestedCrossValidationTrainingStage(train_context_skm)
 #s3 = NestedCrossValidationTrainingStage(train_context_tfm)  # train one context per pipeline execution
-s3.add_stage(ImputeMissingVals(cols, 'constant', fill_value=0))
-s3.add_stage(FeatureScaler(cols, 'min-max'))
+s3.addPreprocessingStage(ImputeMissingVals(cols, 'constant', fill_value=0))
+s3.addPreprocessingStage(FeatureScaler(cols, 'min-max'))
 # s3.add_stage(TransformFeaturesStage(NGramTransformer(col='transcript'))) # example n-gram feature transformer stage
 
 s4 = EvaluationStage(['auroc', 'accuracy', 'auprc'])

@@ -113,6 +113,7 @@ class CrossValidationStage(StageBase):
 
 
 # TODO: This does not tune hyperparameters yet and shouldn't be used until it's implemented 
+# Note: default to avg across parameter grid
 class NestedCrossValidationTrainingStage(StageBase):
     def __init__(self):
         # TODO: make models_to_run generator function
@@ -153,3 +154,64 @@ class NestedCrossValidationTrainingStage(StageBase):
                 dc.set_item(m_name + '_predictions', predictions)
                 # self.addStage(ModelEvaluationStage(m_name))
         return dc
+
+
+
+
+# TODO: This does not tune hyperparameters yet and shouldn't be used until it's implemented 
+# Note: default to avg across parameter grid
+class NestedCrossValidationTrainingStage(StageBase):
+    def __init__(self, training_context):
+        # TODO: make models_to_run generator function
+        self.training_context = training_context
+        self._pipeline = Pipeline()
+        self._preprocessing_pipeline = Pipeline()
+        super().__init__()
+
+    def addStage(self, stage):
+        self._pipeline.addStage(stage)
+
+    def addPreprocessingStage(self, stage):
+        # TODO: check that stage is valid preprocessing stage
+        self._preprocessing_pipeline.addStage(stage)
+        
+    def execute(self, dc):
+        features = self.training_context.feature_cols
+        y_label = self.training_context.ylabel
+
+        cv_splits = dc.get_item("cv_splits")
+        for split in cv_splits:
+            train_idx, test_idx = split
+            data = dc.get_item('data')
+            data_X = data[features]
+            data_y = data[y_label]
+            # map data to CV partitions
+            data_train_X = data_X.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
+            data_train_y = data_y.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
+            data_test_X = data_X.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
+            data_test_y = data_y.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
+            # PSEUDO
+            # run preprocessing pipeline on data_train_X
+            # run preprocessing pipeline on data_test_X
+
+            # maybe this is where we use the other pipeline
+            # load data into pipeline DC
+            # split data_train_X, data_train_Y into validation folds
+            # for each fold assignment in val folds:
+            #   for each hyperparameter combination (training_context.param_grid):
+            #       train a model using hyperparameters (training_context.model)
+            #       write down model results for those hyperparameters using (training_context.param_eval_func)
+            # now use averaging or ranking to choose best hyperparameter combo (training_context.param_eval_goal)
+            # exit pipeline and return best hyperparameters (?)
+
+            # write down best hyperparameters
+            # train final model on all training data using best hyperparameters
+            # make predictions on data_test_X and write them down
+            # do we want to check model performance per fold?
+        return dc
+
+
+
+# Validation folds? Where do we tell it how many? 
+# Repeating preprocessing steps between each round of CV - best way to do this?
+# Spelling conventions for methods: camelCase or under_scores ?
