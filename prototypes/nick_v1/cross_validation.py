@@ -2,7 +2,7 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
 from stage_base import StageBase
-from pipeline import Pipeline
+from pipeline import Pipeline, NestedCVInnerLoopPipeline
 from model_training import ModelTrainingStage
 from dask_ml.model_selection import KFold
 
@@ -161,40 +161,52 @@ class NestedCrossValidationTrainingStage(StageBase):
 # TODO: This does not tune hyperparameters yet and shouldn't be used until it's implemented 
 # Note: default to avg across parameter grid
 class NestedCrossValidationTrainingStage(StageBase):
-    def __init__(self, training_context):
+    def __init__(self, training_context, num_validation_folds):
         # TODO: make models_to_run generator function
-        self.training_context = training_context
-        self._pipeline = Pipeline()
-        self._preprocessing_pipeline = Pipeline()
+        self._training_context = training_context
+        self._num_validation_folds = num_validation_folds
+        self._validation_pipeline = NestedCVInnerLoopPipeline()
+        self._validation_pipeline.setTrainingContext(training_context)
+        self._preprocessing_pipeline = NestedCVInnerLoopPipeline()
+        self._preprocessing_pipeline.setTrainingContext(training_context)
         super().__init__()
 
-    def addStage(self, stage):
-        self._pipeline.addStage(stage)
+    def addValidationStage(self, stage):
+        self._validation_pipeline.addStage(stage)
+
+    def runValidationPipeline(self):
+        return
 
     def addPreprocessingStage(self, stage):
         # TODO: check that stage is valid preprocessing stage
         self._preprocessing_pipeline.addStage(stage)
+
+    def runPreprocessingPipeline(self, data):
+        self._preprocessing_pipeline.setData(data)
+        self._preprocessing_pipeline.run()
+        return self._preprocessing_pipeline.getData()
         
     def execute(self, dc):
-        features = self.training_context.feature_cols
-        y_label = self.training_context.ylabel
+        features = self._training_context.feature_cols
+        ylabel = self._training_context.ylabel
+        if isinstance(ylabel, str):
+            ylabel = [ylabel]
+        cols = features + ylabel
 
         cv_splits = dc.get_item("cv_splits")
         for split in cv_splits:
             train_idx, test_idx = split
             data = dc.get_item('data')
-            data_X = data[features]
-            data_y = data[y_label]
+            data = data[cols]
             # map data to CV partitions
-            data_train_X = data_X.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
-            data_train_y = data_y.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
-            data_test_X = data_X.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
-            data_test_y = data_y.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
-            # PSEUDO
-            # run preprocessing pipeline on data_train_X
-            # run preprocessing pipeline on data_test_X
+            data_train = data.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
+            data_test = data.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
+            
+            # run preprocessing pipeline on data_train_X and data_test_X
+            data_train = runPreprocessingPipeline(data_train_X)
+            data_test = runPreprocessingPipeline(data_test_X)
 
-            # maybe this is where we use the other pipeline
+            # run validation pipeline
             # load data into pipeline DC
             # split data_train_X, data_train_Y into validation folds
             # for each fold assignment in val folds:
@@ -213,5 +225,9 @@ class NestedCrossValidationTrainingStage(StageBase):
 
 
 # Validation folds? Where do we tell it how many? 
+#   - also, which strategy? groupby?
+#   - GenerateCVFoldsStage? - how to pass this in?
 # Repeating preprocessing steps between each round of CV - best way to do this?
 # Spelling conventions for methods: camelCase or under_scores ?
+# Make subclass for preprocessing pipeline and/or validation pipeline
+# should we store the training context in the DC? Else, how do we get out y_label for eval stage
