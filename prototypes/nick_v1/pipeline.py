@@ -14,7 +14,7 @@ class Pipeline(StageBase):
         if isinstance(stage, StageBase):
             self._stages.append(stage)
         else:
-            self.logError("addStage() called with an object which is not derived from "+type(StageBase))
+            self.logError("addStage() called with an object which is not derived from "+ type(StageBase))
         return
 
     def getDC(self):

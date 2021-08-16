@@ -62,11 +62,14 @@ class SupervisedTrainPredictContext(TrainPredictContext):
 
 
 class SupervisedTrainParamGridContext(SupervisedTrainPredictContext):
+    #split into two contexts (one has eval_funct and eval_goal)?
+    #OR keep class and validate checks eval_func (do this)
 	def __init__(self):
 		super().__init__()
 		self._param_grid = None
 		self._param_eval_func = None
 		self._param_eval_goal = None
+		
 
 	def get_param_grid(self):
 		return self._param_grid
@@ -94,6 +97,7 @@ class SupervisedTrainParamGridContext(SupervisedTrainPredictContext):
 		if param_eval_goal not in ['min', 'max']: # TODO: make enum object with min max types
 			raise ValueError('param_eval_goal must be either min or max')
 		self._param_eval_goal = param_eval_goal
+
 
 	def validate(self):
 		super().validate()

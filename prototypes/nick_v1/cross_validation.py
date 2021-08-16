@@ -171,22 +171,23 @@ class NestedCrossValidationTrainingStage(StageBase):
         self._preprocessing_pipeline.setTrainingContext(training_context)
         super().__init__()
 
-    def addValidationStage(self, stage):
+    def _addValidationStage(self, stage):
         self._validation_pipeline.addStage(stage)
 
-    def runValidationPipeline(self):
+    def _runValidationPipeline(self):
         return
 
     def addPreprocessingStage(self, stage):
         # TODO: check that stage is valid preprocessing stage
         self._preprocessing_pipeline.addStage(stage)
 
-    def runPreprocessingPipeline(self, data):
+    def _runPreprocessingPipeline(self, data):
         self._preprocessing_pipeline.setData(data)
         self._preprocessing_pipeline.run()
         return self._preprocessing_pipeline.getData()
         
     def execute(self, dc):
+        #TO DO: call self.valdiate() that calls all validations
         features = self._training_context.feature_cols
         ylabel = self._training_context.ylabel
         if isinstance(ylabel, str):
@@ -203,6 +204,7 @@ class NestedCrossValidationTrainingStage(StageBase):
             data_test = data.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
             
             #extract x and y 
+            #split data on inner loop?
             data_train_X = data_train[features]
             data_test_X = data_test[features]
             data_train_Y = data_train[ylabel]   #could be multiple y labels
@@ -230,10 +232,12 @@ class NestedCrossValidationTrainingStage(StageBase):
 
 
 
-# Validation folds? Where do we tell it how many? 
-#   - also, which strategy? groupby?
+# Validation folds? Where do we tell it how many? (pass in argument directly)
+#   - also, which strategy? groupby?              (user can setPartitionStage) (check to see if they are initialized)
 #   - GenerateCVFoldsStage? - how to pass this in?
-# Repeating preprocessing steps between each round of CV - best way to do this?
-# Spelling conventions for methods: camelCase or under_scores ?
-# Make subclass for preprocessing pipeline and/or validation pipeline
-# should we store the training context in the DC? Else, how do we get out y_label for eval stage
+# Repeating preprocessing steps between each round of CV - best way to do this? (Call validate in execute function)
+# Spelling conventions for methods: camelCase or under_scores ? (Working code now. variable = lower case underscores, camelCase for function names, PascalCase for Class names)
+# Make subclass for preprocessing pipeline and/or validation pipeline (don't need separate pipeline for CV, add function to DataLoader)
+# should we store the training context in the DC? Else, how do we get out y_label for eval stage (pass in training_context to ModelTrainingStage)
+    #To Do: Update ModelTrainingStage
+    #To Do: Update SupervisedTrainParamGridContext validate function
