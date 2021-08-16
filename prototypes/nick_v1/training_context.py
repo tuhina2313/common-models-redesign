@@ -42,6 +42,7 @@ class SupervisedTrainPredictContext(TrainPredictContext):
 		super().__init__()
 		self._ylabel = None
 
+    #move getter and setter for y labels to main class (but then what is unique about this class?)
 	def get_ylabel(self):
 		return self._ylabel
 

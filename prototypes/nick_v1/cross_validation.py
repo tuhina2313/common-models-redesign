@@ -197,10 +197,16 @@ class NestedCrossValidationTrainingStage(StageBase):
         for split in cv_splits:
             train_idx, test_idx = split
             data = dc.get_item('data')
-            data = data[cols]
+            data = data[cols]  # x and y cols
             # map data to CV partitions
             data_train = data.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
             data_test = data.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
+            
+            #extract x and y 
+            data_train_X = data_train[features]
+            data_test_X = data_test[features]
+            data_train_Y = data_train[ylabel]   #could be multiple y labels
+            data_test_Y = data_test[ylabel]     #could be multiple y labels
             
             # run preprocessing pipeline on data_train_X and data_test_X
             data_train = runPreprocessingPipeline(data_train_X)
