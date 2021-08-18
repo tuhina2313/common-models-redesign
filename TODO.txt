@@ -1,0 +1,20 @@
+8/18/2021
+Add pure abstract method `validate` to StageBase
+ - Reasoning: Force future devs to consciously choose whether/how to validate their stages
+ - Consider ways to enforce `validate` method call somewhere in the `execute` for all subclasses
+ 	- example where this would be helpful: EvaluationStage
+
+Refactoring
+ - Rename all stages to end with `Stage` suffix
+ - Correct naming insonsistencies to the following:
+ 	- Class Names --> PascalCase
+ 	- Functions   --> camelCase
+ 	- Variables   --> under_scores
+
+Update ModelTrainingStage
+ - should accept a training_context object
+
+ Update feature column names after encoding stage
+
+ Update CrossValidationStage
+  - should accept training context

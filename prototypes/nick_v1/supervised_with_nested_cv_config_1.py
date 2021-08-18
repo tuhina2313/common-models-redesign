@@ -71,7 +71,8 @@ train_context_tfm.optimizer = 'sgd'
 
 
 s3 = NestedCrossValidationTrainingStage(train_context_skm)
-#s3 = NestedCrossValidationTrainingStage(train_context_tfm)  # train one context per pipeline execution
+validation_folds = GenerateCVFolds(k_folds=3, strategy='random', strategy_args={'seed':42})
+s3.setValidationCVFoldsStage(validation_folds)
 s3.addPreprocessingStage(ImputeMissingVals(cols, 'constant', fill_value=0))
 s3.addPreprocessingStage(FeatureScaler(cols, 'min-max'))
 # s3.add_stage(TransformFeaturesStage(NGramTransformer(col='transcript'))) # example n-gram feature transformer stage

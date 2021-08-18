@@ -7,7 +7,14 @@ from tensorflow import keras
 
 import dask.dataframe as dd
 
-class CSVReader(StageBase):
+
+class DataLoaderStageBase(StageBase):
+    def __init__(self):
+        super().__init__()
+        self.setLoggingPrefix('DataLoaderStage: ')
+
+
+class CSVReader(DataLoaderStageBase):
     def __init__(self, data_dir, file_name):
         # TODO: Way to handle directory with multiple files
         self.data_path = os.path.join(data_dir, file_name)
@@ -23,8 +30,17 @@ class CSVReader(StageBase):
         return dc
 
 
+class LoadDataFromMemory(DataLoaderStageBase):
+    def __init__(self, data):
+        self.data = data
+        super().__init__()
+    
+    def execute(self, dc):
+        dc.set_item('data', data)
+        return dc
 
-class LoadFashionMNIST(StageBase):
+
+class LoadFashionMNIST(DataLoaderStageBase):
     def __init__(self):
         self.input_dir = "../sample_data/mnist/"
         super().__init__()

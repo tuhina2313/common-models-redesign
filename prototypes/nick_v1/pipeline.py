@@ -29,21 +29,3 @@ class Pipeline(StageBase):
             dc = stage.execute(dc)
         return dc
 
-
-class NestedCVInnerLoopPipeline(Pipeline):
-    def __init__(self):
-        self._training_context = None
-        super().__init__()
-
-    def setData(self, data): 
-        self._dc.set_item('data', data)
-        return
-
-    def getData(self): 
-        data = self._dc.get_item('data')
-        return data
-
-    def setTrainingContext(self, training_context):
-        # TODO: check that training context is valid
-        self._training_context = training_context
-        return

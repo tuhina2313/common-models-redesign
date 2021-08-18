@@ -2,10 +2,14 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
 from stage_base import StageBase
-from pipeline import Pipeline, NestedCVInnerLoopPipeline
+from pipeline import Pipeline
 from model_training import ModelTrainingStage
-from dask_ml.model_selection import KFold
+from preprocessing import PreprocessingStageBase
+from load_data import LoadDataFromMemory
+from training_context import SupervisedTrainParamGridContext
+from evaluation_stage import EvaluationStage
 
+from dask_ml.model_selection import KFold
 import joblib
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
@@ -56,7 +60,7 @@ class GenerateCVFolds(StageBase):
 
 
 
-class CrossValidationStage(StageBase):
+class CrossValidationStage(StageBase): # TODO update this
     def __init__(self):
         # TODO: make models_to_run generator function
         self.models_to_run = None
@@ -161,83 +165,91 @@ class NestedCrossValidationTrainingStage(StageBase):
 # TODO: This does not tune hyperparameters yet and shouldn't be used until it's implemented 
 # Note: default to avg across parameter grid
 class NestedCrossValidationTrainingStage(StageBase):
-    def __init__(self, training_context, num_validation_folds):
+    def __init__(self):
         # TODO: make models_to_run generator function
-        self._training_context = training_context
-        self._num_validation_folds = num_validation_folds
-        self._validation_pipeline = NestedCVInnerLoopPipeline()
-        self._validation_pipeline.setTrainingContext(training_context)
-        self._preprocessing_pipeline = NestedCVInnerLoopPipeline()
-        self._preprocessing_pipeline.setTrainingContext(training_context)
+        self._training_context = None
+        self._validation_cv_stage = None
+        self._preprocessing_stages = []
         super().__init__()
+        self.setLoggingPrefix('NestedCrossValidationTrainingStage: ')
 
-    def _addValidationStage(self, stage):
-        self._validation_pipeline.addStage(stage)
-
-    def _runValidationPipeline(self):
+    def _validate(self):
+        for stage in self._preprocessing_stages:
+            if not issubclass(stage, PreprocessingStageBase):
+                raise ValueError("addPreprocessingStage only accepts PreprocessingStageBase arg type")
+        if not isinstance(self._validation_cv_stage, GenerateCVFolds):
+            raise ValueError("setValidationCVFoldsStage requires GenerateCVFolds arg type")
+        if not issubclass(self._training_context, SupervisedTrainParamGridContext):
+            raise ValueError("setTrainingContext requires SupervisedTrainParamGridContext arg type")
         return
 
-    def addPreprocessingStage(self, stage):
-        # TODO: check that stage is valid preprocessing stage
-        self._preprocessing_pipeline.addStage(stage)
+    def _createIterableParameterGrid(self, param_grid):
+        # TODO
 
-    def _runPreprocessingPipeline(self, data):
-        self._preprocessing_pipeline.setData(data)
-        self._preprocessing_pipeline.run()
-        return self._preprocessing_pipeline.getData()
+    def addPreprocessingStage(self, stage):
+        self._preprocessing_stages.append(stage)
+
+    def setValidationCVFoldsStage(self, stage):
+        self._validation_cv_stage = stage
+
+    def setTrainingContext(self, training_context):
+        self._training_context = training_context
         
     def execute(self, dc):
-        #TO DO: call self.valdiate() that calls all validations
-        features = self._training_context.feature_cols
-        ylabel = self._training_context.ylabel
-        if isinstance(ylabel, str):
-            ylabel = [ylabel]
-        cols = features + ylabel
+        self._validate()
 
         cv_splits = dc.get_item("cv_splits")
-        for split in cv_splits:
+        for i in range(len(cv_splits)):
+            split = cv_splits[i]
             train_idx, test_idx = split
             data = dc.get_item('data')
             data = data[cols]  # x and y cols
             # map data to CV partitions
-            data_train = data.map_partitions(lambda x: x[x.index.isin(train_idx.compute())])
+            data_train = data.map_partitions(lambda x: x[x.index.isin(train_idx.compute())]) # TODO: can we move compute elsewhere to improve speed?
             data_test = data.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
-            
-            #extract x and y 
-            #split data on inner loop?
-            data_train_X = data_train[features]
-            data_test_X = data_test[features]
-            data_train_Y = data_train[ylabel]   #could be multiple y labels
-            data_test_Y = data_test[ylabel]     #could be multiple y labels
-            
-            # run preprocessing pipeline on data_train_X and data_test_X
-            data_train = runPreprocessingPipeline(data_train_X)
-            data_test = runPreprocessingPipeline(data_test_X)
 
-            # run validation pipeline
-            # load data into pipeline DC
-            # split data_train_X, data_train_Y into validation folds
-            # for each fold assignment in val folds:
-            #   for each hyperparameter combination (training_context.param_grid):
-            #       train a model using hyperparameters (training_context.model)
-            #       write down model results for those hyperparameters using (training_context.param_eval_func)
-            # now use averaging or ranking to choose best hyperparameter combo (training_context.param_eval_goal)
-            # exit pipeline and return best hyperparameters (?)
+            # upack training_context
+            param_grid = self._createIterableParameterGrid(self._training_context.param_grid)
+            eval_func = self._training_context.param_eval_func
+            eval_goal = self._training_context.eval_goal
+            
+            param_grid_eval_results = []
+            for point in param_grid:
+                p = Pipeline()
+                p.addStage(LoadDataFromMemory(data_train))
+                for stage in self._preprocessing_stages:
+                    p.addStage(stage)
+                p.addStage(self._validation_cv_stage)
+                cv_stage_context = SupervisedTrainParamGridContext()
+                cv_stage_context.param_grid = point
+                cv_stage = CrossValidationStage(cv_stage_context)
+                p.addStage(cv_stage)
+                p.addStage(EvaluationStage(eval_func))
+                p.run()
+                dc = p.getDC()
+                eval_result = dc.get_item('model_evaluation_results')[eval_func]
+                param_grid_eval_results.append((point, eval_result))
 
-            # write down best hyperparameters
-            # train final model on all training data using best hyperparameters
-            # make predictions on data_test_X and write them down
-            # do we want to check model performance per fold?
+            param_grid_eval_results.sort(key=lambda x: x[1], reverse=(eval_goal=='max'))
+            best_point = param_grid_eval_results[0]
+            # store results in dict - described below
         return dc
 
 
 
-# Validation folds? Where do we tell it how many? (pass in argument directly)
-#   - also, which strategy? groupby?              (user can setPartitionStage) (check to see if they are initialized)
-#   - GenerateCVFoldsStage? - how to pass this in?
-# Repeating preprocessing steps between each round of CV - best way to do this? (Call validate in execute function)
-# Spelling conventions for methods: camelCase or under_scores ? (Working code now. variable = lower case underscores, camelCase for function names, PascalCase for Class names)
-# Make subclass for preprocessing pipeline and/or validation pipeline (don't need separate pipeline for CV, add function to DataLoader)
-# should we store the training context in the DC? Else, how do we get out y_label for eval stage (pass in training_context to ModelTrainingStage)
-    #To Do: Update ModelTrainingStage
-    #To Do: Update SupervisedTrainParamGridContext validate function
+
+# Repeating preprocessing steps between each round of CV 
+
+# dict
+#   'results_per_fold'
+#     '1'
+#       'param_grid_results': [(param_point1, value), (param_point2, value)]
+#       'best_params': (param_point, value)
+#     '2'
+#       ...
+#     ...
+#   'results'
+#      'avg_param_grid_results': [(param_point1, avg_value), (param_point2, avg_value)]
+#      'best_avg_params': (param_point, value)
+
+#   'predictions': y_pred

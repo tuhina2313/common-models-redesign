@@ -7,7 +7,14 @@ from dask_ml.preprocessing import MinMaxScaler, StandardScaler, OneHotEncoder, L
 from dask_ml.impute import SimpleImputer
 
 
-class ImputeMissingVals(StageBase):
+
+class PreprocessingStageBase(StageBase):
+    def __init__(self):
+        super().__init__()
+        self.setLoggingPrefix('PreprocessingStage: ')
+
+
+class ImputeMissingVals(PreprocessingStageBase):
     def __init__(self, cols, strategy, fill_value=None):
         self.cols = cols
         self.strategy = strategy.lower()
@@ -39,7 +46,7 @@ class ImputeMissingVals(StageBase):
         return dc
 
 
-class FeatureScaler(StageBase):
+class FeatureScaler(PreprocessingStageBase):
     def __init__(self, cols, strategy, feature_range=(0,1)):
         self.cols = cols
         self.strategy = strategy.lower()
@@ -70,7 +77,7 @@ class FeatureScaler(StageBase):
     
     
     
-class EncodeLabels(StageBase):
+class EncodeLabels(PreprocessingStageBase):
     def __init__(self, cols, strategy):
         self.cols = cols
         self.strategy = strategy.lower()

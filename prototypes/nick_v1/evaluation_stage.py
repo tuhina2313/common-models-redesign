@@ -7,6 +7,8 @@ from utils import get_sklearn_scoring_func as get_eval_func
 
 class EvaluationStage(StageBase):
     def __init__(self, methods):
+        if isinstance(methods, str):
+            methods = [methods]
         self._methods = methods
         self._eval_funcs = []
         try:
