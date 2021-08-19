@@ -247,19 +247,20 @@ class NestedCrossValidationTrainingStage(StageBase):
             nested_cv_results['results_per_fold'][i]['param_grid_results'] = param_grid_eval_results
             nested_cv_results['results_per_fold'][i]['best_params'] = best_point
         
-        results_all_folds = [] #TODO: alter to take into account
+        results_all_folds = [] # essentially mimicking a dictionary without being one
         for key, value in nested_cv_results['results_per_fold']:
             for p, p_val in value['param_grid_results']:
-                
-                if p in results_all_folds:
-                    results_all_folds[p].append[p_val]  #TODO: using point as key, have to change
+                all_ps = [x[0] for x in results_all_folds] # Get out all points that have been seen so far
+                if p in all_ps:
+                    p_index = all_ps.index(p)
+                    results_all_folds[p_index][1].append(p_val) # save p_val to list of vals held by p
                 else:
-                    results_all_folds[p] = [p_val]
+                    results_all_folds.append([p,[p_val]])
                     
         avg_results = []
-        for key, value in results_all_folds:
-            avg = np.mean(results_all_folds[key])
-            avg_results.append((key, avg))
+        for p_results in results_all_folds:
+            avg = np.mean(p_results[1])
+            avg_results.append((p_results[0], avg))
         avg_results(key = lambda x: x[1], reverse=(eval_goal=='max'))
         nested_cv_results['results']['average_param_grid_results'] = avg_results
         nested_cv_results['results']['best_avg_params'] = avg_results[0]
