@@ -18,3 +18,5 @@ Update ModelTrainingStage
 
  Update CrossValidationStage
   - should accept training context
+
+Finish GenerateCVFolds functionality
