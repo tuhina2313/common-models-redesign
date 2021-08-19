@@ -15,6 +15,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 
 import numpy as np
+import itertools
 
 
 class GenerateCVFolds(StageBase):
@@ -184,7 +185,11 @@ class NestedCrossValidationTrainingStage(StageBase):
         return
 
     def _createIterableParameterGrid(self, param_grid):
-        # TODO
+        param_vals = list(itertools.product(*[v for v in param_grid.values()]))
+        param_keys = [k for k in param_grid.keys()]
+        param_grid_list = [dict(zip(param_keys, param_vals[i])) for i in range(len(param_vals))]
+        return param_grid_list
+
 
     def addPreprocessingStage(self, stage):
         self._preprocessing_stages.append(stage)
@@ -234,25 +239,26 @@ class NestedCrossValidationTrainingStage(StageBase):
                 p.run()
                 dc = p.getDC()
                 eval_result = dc.get_item('model_evaluation_results')[eval_func]
-                param_grid_eval_results.append((point, eval_result))
+                param_grid_eval_results.append((point, eval_result))  #TODO: update "point" as dictionary
 
             param_grid_eval_results.sort(key=lambda x: x[1], reverse=(eval_goal=='max'))
             best_point = param_grid_eval_results[0]
             # store results in dict - described below
-            nest_cv_results['results_per_fold'][i]['param_grid_results'] = param_grid_eval_results
-            nest_cv_results['results_per_fold'][i]['best_params'] = best_point
+            nested_cv_results['results_per_fold'][i]['param_grid_results'] = param_grid_eval_results
+            nested_cv_results['results_per_fold'][i]['best_params'] = best_point
         
-        results_all_folds = {}
-        for key, value in nest_cv_results['results_per_fold']:
+        results_all_folds = [] #TODO: alter to take into account
+        for key, value in nested_cv_results['results_per_fold']:
             for p, p_val in value['param_grid_results']:
+                
                 if p in results_all_folds:
-                    results_all_folds[p].append[p_val]
+                    results_all_folds[p].append[p_val]  #TODO: using point as key, have to change
                 else:
                     results_all_folds[p] = [p_val]
                     
         avg_results = []
         for key, value in results_all_folds:
-            avg = np.mean(results_all_folds[k])
+            avg = np.mean(results_all_folds[key])
             avg_results.append((key, avg))
         avg_results(key = lambda x: x[1], reverse=(eval_goal=='max'))
         nested_cv_results['results']['average_param_grid_results'] = avg_results
@@ -261,19 +267,6 @@ class NestedCrossValidationTrainingStage(StageBase):
         dc['nested_cv_results'] = nested_cv_results
         
         return dc
-
-# results_all_folds = {}
-# for key, value in nest_cv_results['results_per_fold']:
-# 	for p, p_val in value['param_grid_results']:
-# 		if p in results_all_folds:
-# 			results_all_folds[p].append[p_val]
-# 		else:
-# 			results_all_folds[p] = [p_val]
-
-#then results_all_folds = {'p1': [1,2,3,4], 'p2':[4,5,4],...}
-
-
-# Repeating preprocessing steps between each round of CV 
 
 # dict
 #   'results_per_fold'
