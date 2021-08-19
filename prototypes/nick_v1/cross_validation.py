@@ -197,8 +197,14 @@ class NestedCrossValidationTrainingStage(StageBase):
         
     def execute(self, dc):
         self._validate()
-
+        
         cv_splits = dc.get_item("cv_splits")
+        nested_cv_results = {'results_per_fold':{},
+                             'results': {},
+                             'predictions': (len(cv_splits[0][0] + len(cv_splits[0][1])))*[np.nan]
+                             }
+        
+        
         for i in range(len(cv_splits)):
             split = cv_splits[i]
             train_idx, test_idx = split
@@ -233,9 +239,38 @@ class NestedCrossValidationTrainingStage(StageBase):
             param_grid_eval_results.sort(key=lambda x: x[1], reverse=(eval_goal=='max'))
             best_point = param_grid_eval_results[0]
             # store results in dict - described below
+            nest_cv_results['results_per_fold'][i]['param_grid_results'] = param_grid_eval_results
+            nest_cv_results['results_per_fold'][i]['best_params'] = best_point
+        
+        results_all_folds = {}
+        for key, value in nest_cv_results['results_per_fold']:
+            for p, p_val in value['param_grid_results']:
+                if p in results_all_folds:
+                    results_all_folds[p].append[p_val]
+                else:
+                    results_all_folds[p] = [p_val]
+                    
+        avg_results = []
+        for key, value in results_all_folds:
+            avg = np.mean(results_all_folds[k])
+            avg_results.append((key, avg))
+        avg_results(key = lambda x: x[1], reverse=(eval_goal=='max'))
+        nested_cv_results['results']['average_param_grid_results'] = avg_results
+        nested_cv_results['results']['best_avg_params'] = avg_results[0]
+        
+        dc['nested_cv_results'] = nested_cv_results
+        
         return dc
 
+# results_all_folds = {}
+# for key, value in nest_cv_results['results_per_fold']:
+# 	for p, p_val in value['param_grid_results']:
+# 		if p in results_all_folds:
+# 			results_all_folds[p].append[p_val]
+# 		else:
+# 			results_all_folds[p] = [p_val]
 
+#then results_all_folds = {'p1': [1,2,3,4], 'p2':[4,5,4],...}
 
 
 # Repeating preprocessing steps between each round of CV 
