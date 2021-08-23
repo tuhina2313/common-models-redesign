@@ -14,8 +14,11 @@ from stage_base import StageBase
 
 from scikeras.wrappers import KerasClassifier
 
+#TODO: make compatible with model.py
+       #data container stores train and test data
 
-
+#CLASS DESCRIPTION:
+# trains on training data(in dc)
 class ModelTrainingStage(StageBase):
     def __init__(self, m_name, model, train_X, train_y, test_X, test_y):
         self.m_name = m_name

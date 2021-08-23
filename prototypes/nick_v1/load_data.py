@@ -7,7 +7,8 @@ from tensorflow import keras
 
 import dask.dataframe as dd
 
-
+#TODO: add LoadTrainData and LoadTestData Classes, push to c as "train_data" and "test_data"
+    
 class DataLoaderStageBase(StageBase):
     def __init__(self):
         super().__init__()

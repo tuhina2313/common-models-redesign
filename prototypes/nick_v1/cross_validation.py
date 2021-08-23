@@ -17,6 +17,8 @@ from sklearn.metrics import accuracy_score
 import numpy as np
 import itertools
 
+#TODO: Add commented descriptions of each class above Class name
+
 
 class GenerateCVFolds(StageBase):
     def __init__(self, k_folds, strategy, strategy_args):
@@ -59,8 +61,10 @@ class GenerateCVFolds(StageBase):
         return dc
 
 
-
-
+# CLASS DESCRIPTION:
+# Treates each subset in the data partition as a test set and remaining data as training set. 
+# Uses cross validation to make predictions on each test set. 
+# Does not tune hyperparameters.
 class CrossValidationStage(StageBase): # TODO update this
     def __init__(self):
         # TODO: make models_to_run generator function
@@ -72,25 +76,35 @@ class CrossValidationStage(StageBase): # TODO update this
 
     def addStage(self, stage):
         self._pipeline.addStage(stage)
+        
+    #TODO: add these stages
+    # def addPreprocessingStage(self, stage):
+    #     self._preprocessing_stages.append(stage)
+
+    # def setValidationCVFoldsStage(self, stage):
+    #     self._validation_cv_stage = stage
+
+    # def setTrainingContext(self, training_context):
+    #     self._training_context = training_context
 
     def execute(self, dc):
         self.logInfo("Starting Cross-Validation Stage")
         splits = dc.get_item("cv_splits")
         self.models_to_run = dc.get_item('models_to_run')
         data = dc.get_item('data')
-        for m in self.models_to_run:
+        for m in self.models_to_run:    #TODO: do not use models_to_runs anymore, need to delete
             m_name = [k for k in m.keys()][0] 
             model_params = m[m_name]['params']
             model = model_params['model']   
             features = model_params['feature_col_names'] # what about nltk n-grams?
             labels_to_predict = model_params['y_labels'] 
             backend = model_params['backend']
-            for l in labels_to_predict:
+            for l in labels_to_predict: #TODO: only predict one label ata time now, delete this. (user creates their own loop in settings)
                 self.logInfo("Starting CV for {} for label {}".format(m_name, l))
                 l_name = l
                 predictions = np.zeros((len(data.index),1)) # TODO - handle non numeric types and use Dask
                 cv_counter = 0
-                for s in splits:
+                for s in splits:        #TODO: add in preprocessing stage
                     cv_counter += 1
                     self.logInfo("Running CV for fold {}".format(cv_counter))
                     train_idx, test_idx = s
@@ -103,8 +117,8 @@ class CrossValidationStage(StageBase): # TODO update this
                     data_test_X = data_X.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
                     data_test_y = data_y.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
                     # fit model
-                    with joblib.parallel_backend('dask'):
-                        if backend == 'sklearn':
+                    with joblib.parallel_backend('dask'):   
+                        if backend == 'sklearn':        #TODO: use model_training stage instead
                             fitted_model = model.fit(data_train_X, data_train_y)
                             y_preds = fitted_model.predict(data_test_X)
                             predictions[test_idx.compute(),0] = y_preds
@@ -117,7 +131,7 @@ class CrossValidationStage(StageBase): # TODO update this
 
 
 
-# TODO: This does not tune hyperparameters yet and shouldn't be used until it's implemented 
+#TODO: delete this class?
 # Note: default to avg across parameter grid
 class NestedCrossValidationTrainingStage(StageBase):
     def __init__(self):
@@ -131,6 +145,7 @@ class NestedCrossValidationTrainingStage(StageBase):
     def addStage(self, stage):
         self._pipeline.addStage(stage)
         
+    
     def execute(self, dc):
         splits = dc.get_item("cv_splits")
         self.models_to_run = dc.get_item('models_to_run')
@@ -247,7 +262,8 @@ class NestedCrossValidationTrainingStage(StageBase):
             nested_cv_results['results_per_fold'][i]['param_grid_results'] = param_grid_eval_results
             nested_cv_results['results_per_fold'][i]['best_params'] = best_point
         
-        results_all_folds = [] # essentially mimicking a dictionary without being one
+        # results_all_folds acts a temp object for computing averages
+        results_all_folds = []
         for key, value in nested_cv_results['results_per_fold']:
             for p, p_val in value['param_grid_results']:
                 all_ps = [x[0] for x in results_all_folds] # Get out all points that have been seen so far
