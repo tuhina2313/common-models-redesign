@@ -15,11 +15,20 @@ class PreprocessingStageBase(StageBase):
 
 
 class ImputeMissingVals(PreprocessingStageBase):
-    def __init__(self, cols, strategy, fill_value=None):
+    def __init__(self, cols, strategy, fill_value=None): 
         self.cols = cols
         self.strategy = strategy.lower()
         self.fill_value = fill_value
+        self._fit_transform_data_idx = None
+        self._transform_data_idx = None
         super().__init__()
+
+    def _validate(self):
+        # TODO: add validate function for basic type checking
+        if self._fit_transform_data_idx is None:
+            raise ValueError("Must provide _fit_transform_data_idx to fit imputer on in ImputeMissingVals stage")
+        if self._transform_data_idx is None:
+            raise ValueError("Must provide _transform_data_idx to impute in ImputeMissingVals stage")
 
     def _get_imputer(self, strategy, fill_value):
         imputers = {
@@ -33,15 +42,26 @@ class ImputeMissingVals(PreprocessingStageBase):
         self.logInfo("Imputer strategy selected as {}".format(strategy))
         return imputers[strategy]
 
+    def set_fit_transform_data_idx(self, fit_transform_data_idx):
+        self._fit_transform_data_idx = fit_transform_data_idx
+
+    def set_transform_data_idx(self, transform_data_idx):
+        self._transform_data_idx = transform_data_idx
+
     def execute(self, dc):
         imputer = self._get_imputer(self.strategy, self.fill_value)
         self.logInfo("Imputing missing values for columns: {}".format(self.cols))
         X = dc.get_item('data')
-        cols_to_impute = X[self.cols]
-        imputer = imputer.fit(cols_to_impute)
-        imputed_cols = imputer.transform(cols_to_impute)
-        imputed_cols.compute()
-        X[self.cols] = imputed_cols
+        data_to_impute = X[self.cols]
+        fit_transform_data = data_to_impute.map_partitions(lambda x: x[x.index.isin(self._fit_transform_data_idx.compute())])
+        imputer = imputer.fit(fit_transform_data)
+        fit_transform_data = imputer.transform(fit_transform_data)
+        transform_data = data_to_impute.map_partitions(lambda x: x[x.index.isin(self._transform_data_idx.compute())])
+        transform_data = imputer.transform(transform_data)
+        fit_transform_data.compute()
+        transform_data.compute()
+        X.loc[self._fit_transform_data_idx, self.cols] = fit_transform_data   # TODO: make this dask compatible
+        X.loc[self._transform_data_idx, self.cols] = transform_data
         dc.set_item('data', X)
         return dc
 
