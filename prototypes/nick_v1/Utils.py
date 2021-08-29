@@ -48,7 +48,7 @@ def get_tensorflow_loss_func(loss_str):
         loss_fn = get_loss(loss_str)
         return loss_fn
     else:
-        raise ValueError('Loss function {} not supported by Tensorflow'.format(loss_str))
+        raise ValueError('Loss function "{}" not supported by Tensorflow'.format(loss_str))
         
     
 def get_tensorflow_metric_func(metric_str):

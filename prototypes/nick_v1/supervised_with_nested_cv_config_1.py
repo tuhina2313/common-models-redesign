@@ -1,7 +1,7 @@
 from load_data import CSVReader
-from preprocessing import ImputeMissingVals, FeatureScaler, EncodeLabels
+from preprocessing import ImputerPreprocessingStage, FeatureScalerPreprocessingStage, EncodeLabels
 from pipeline import Pipeline
-from cross_validation import GenerateCVFolds, NestedCrossValidationTrainingStage
+from cross_validation import GenerateCVFoldsStage, NestedCrossValidationTrainingStage
 from model_training import ModelTrainingStage
 from evaluation_stage import EvaluationStage
 
@@ -14,7 +14,6 @@ import tensorflow as tf
 from tensorflow import keras
 
 # Use case 3: hyperparameter tuning and training
-
 
 
 def my_sklearn_model_func(params):
@@ -47,14 +46,13 @@ categorical_cols = ['species']
 
 s1 = EncodeLabels(categorical_cols, 'labelencoder')
 
-s2 = GenerateCVFolds(k_folds=5, strategy='random', strategy_args={'seed':42}) 
-
+s2 = GenerateCVFoldsStage(k_folds=5, strategy='random', strategy_args={'seed':42}) 
 
 # init training context for sklearn supervised model with nested CV params
 train_context_skm = SklearnSupervisedTrainParamGridContext()
 train_context_skm.model = skm
 train_context_skm.feature_cols = cols
-train_context_skm.ylabel = categorical_cols
+train_context_skm.y_label = categorical_cols
 train_context_skm.param_grid = {'n_estimators': [10,100,1000], 'max_depth': [1,10,None]}
 train_context_skm.param_eval_func = 'accuracy'
 train_context_skm.param_eval_goal = 'max'
@@ -63,28 +61,30 @@ train_context_skm.param_eval_goal = 'max'
 train_context_tfm = TensorFlowSupervisedTrainParamGridContext()
 train_context_tfm.model = tfm
 train_context_tfm.feature_cols = cols
-train_context_tfm.ylabel = categorical_cols
+train_context_tfm.y_label = categorical_cols
 train_context_tfm.param_grid = {'hidden_layer_size': [3,4,5,6]}
-train_context_tfm.param_eval_func = 'accuracy'
+train_context_tfm.param_eval_func = 'categorical_crossentropy'
 train_context_tfm.param_eval_goal = 'max'
 train_context_tfm.optimizer = 'sgd'
 
 
-s3 = NestedCrossValidationTrainingStage(train_context_skm)
-validation_folds = GenerateCVFolds(k_folds=3, strategy='random', strategy_args={'seed':42})
+s3 = NestedCrossValidationTrainingStage()
+s3.setTrainingContext(train_context_skm)
+validation_folds = GenerateCVFoldsStage(k_folds=3, strategy='random', strategy_args={'seed':42})
 s3.setValidationCVFoldsStage(validation_folds)
-s3.addPreprocessingStage(ImputeMissingVals(cols, 'constant', fill_value=0))
-s3.addPreprocessingStage(FeatureScaler(cols, 'min-max'))
+s3.addPreprocessingStage(ImputerPreprocessingStage(cols, 'constant', fill_value=0))
+s3.addPreprocessingStage(FeatureScalerPreprocessingStage(cols, 'min-max'))
 # s3.add_stage(TransformFeaturesStage(NGramTransformer(col='transcript'))) # example n-gram feature transformer stage
 
-s4 = EvaluationStage(['auroc', 'accuracy', 'auprc'])
+s4 = EvaluationStage(['roc_auc', 'accuracy'])
 
 
 p = Pipeline()
-p.add_stage(s1)
-p.add_stage(s2)
-p.add_stage(s3)
-p.add_stage(s4)
+p.addStage(s0)
+p.addStage(s1)
+p.addStage(s2)
+p.addStage(s3)
+p.addStage(s4)
 p.run()
 
 

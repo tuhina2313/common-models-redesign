@@ -33,11 +33,11 @@ class CSVReader(DataLoaderStageBase):
 
 class LoadDataFromMemory(DataLoaderStageBase):
     def __init__(self, data):
-        self.data = data
+        self._data = data
         super().__init__()
     
     def execute(self, dc):
-        dc.set_item('data', data)
+        dc.set_item('data', self._data)
         return dc
 
 

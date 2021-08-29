@@ -11,37 +11,66 @@ import dask.dataframe as dd
 import dask.array as da
 
 from stage_base import StageBase
-
-from scikeras.wrappers import KerasClassifier
-
-#TODO: make compatible with model.py
-       #data container stores train and test data
-
-#CLASS DESCRIPTION:
-# trains on training data(in dc)
-class ModelTrainingStage(StageBase):
-    def __init__(self, m_name, model, train_X, train_y, test_X, test_y):
-        self.m_name = m_name
-        self.model = model
-        self.train_X = train_X
-        self.train_y = train_y
-        self.test_X = test_X
+class ModelPredictionStage(StageBase):
+    def __init__(self, test_idx):
         super().__init__()
+        self._test_idx = test_idx
+        self._training_context = None
+
+    def _validate(self, dc):
+        if not issubclass(self._training_context, SupervisedTrainParamGridContext):
+            raise ValueError("{} requires a context of type {}".format(type(self).__name__, type(SupervisedTrainingParamGridContext)))
+        if min(self._test_idx) > 0 or max(self._test_idx) >= len(dc.get_item("data").index):
+            raise ValueError("Test indices exceed bounds of the data size in {}".format(type(self).__name__))
+
+    def setTrainingContext(self, training_context):
+        self._training_context = training_context
+
+    def execute(self, dc):
+        self._validate(dc)
+        trained_model = dc.get_item("trained_model")
+        self.logInfo("Making predictions with model {}".format(type(trained_model).__name__))
+
+        data = dc.get_item('data')
+        data_test = data[self._training_context.feature_cols]
+        data_test = data_test.map_partitions(lambda x: x[x.index.isin(self._test_idx)])
+
+        with joblib.parallel_backend('dask'):
+            predictions = trained_model.predict(data_test)
+
+        dc.set_item('predictions', predictions)
+        return dc
+
+# trains on the input indices (rows) of the data stored in the dc
+class ModelTrainingStage(StageBase):
+    def __init__(self, train_idx):
+        super().__init__()
+        self._train_idx = train_idx
+        self._training_context = None
+
+    def _validate(self, dc):
+        if not issubclass(self._training_context, SupervisedTrainParamGridContext):
+            raise ValueError("{} requires a context of type {}".format(type(self).__name__, type(SupervisedTrainingParamGridContext).__name__))
+        if min(self._train_idx) < 0 or max(self._train_idx) >= len(dc.get_item("data").index):
+            raise ValueError("Training indices exceed bounds of the data size in {}".format(type(self).__name__))
+
+    def setTrainingContext(self, training_context):
+        self._training_context = training_context
     
     def execute(self, dc):
-        with joblib.parallel_backend('dask'):
-            self.logInfo("fitting model {}".format(self.m_name))
-            fitted_model = self.model.fit(self.train_X, self.train_y)
-            y_preds = fitted_model.predict(self.test_X)
+        self._validate(dc)
+        self.logInfo("Starting model training stage with model {}".format(type(self._training_context.model).__name__))
 
-            preds_key = self.m_name + '_predictions'
-            dc_keys = dc.get_keys()
-            if preds_key not in dc_keys:
-                dc.set_item(preds_key, np.array([]))
-                
-            past_preds = dc.get_item(preds_key)
-            model_preds = np.append(past_preds, y_preds)
-            dc.set_item(preds_key, model_preds)
+        data = dc.get_item('data')
+        data_train = data[self._training_context.feature_cols]
+        label_train = data[self._training_context.ylabel]
+        data_train = data_train.map_partitions(lambda x: x[x.index.isin(self._train_idx)])
+        label_train = label_train.map_partitions(lambda y: y[y.index.isin(self._train_idx)])
+
+        with joblib.parallel_backend('dask'):
+            fitted_model = self._training_context.model.fit(data_train, label_train)
+
+        dc.set_item('trained_model', fitted_model)
         return dc
 
 

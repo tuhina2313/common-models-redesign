@@ -7,16 +7,21 @@ from utils import get_sklearn_scoring_func as get_eval_func
 
 class EvaluationStage(StageBase):
     def __init__(self, methods):
-        if isinstance(methods, str):
-            methods = [methods]
-        self._methods = methods
+        super().__init__()
+        try: # Force methods to be an iterable
+            iter(methods)
+            self._methods = methods
+        except:
+            self._methods = [methods]
         self._eval_funcs = []
         try:
             for method in methods:
-                eval_func = get_eval_func(method)
+                eval_func = method
+                if not callable(eval_func):
+                    eval_func = get_eval_func(method)
                 self._eval_funcs.append(eval_func)
         except:
-            self.logError("Unable to map input method '%s' to an evaluation function"%(method))
+            self.logError("Unable to map input methods '{}' to an evaluation function".format(methods))
             self._eval_funcs = None
         super().__init__()
 

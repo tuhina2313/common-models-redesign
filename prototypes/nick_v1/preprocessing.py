@@ -12,35 +12,8 @@ class PreprocessingStageBase(StageBase):
     def __init__(self):
         super().__init__()
         self.setLoggingPrefix('PreprocessingStage: ')
-
-
-class ImputeMissingVals(PreprocessingStageBase):
-    def __init__(self, cols, strategy, fill_value=None): 
-        self.cols = cols
-        self.strategy = strategy.lower()
-        self.fill_value = fill_value
         self._fit_transform_data_idx = None
         self._transform_data_idx = None
-        super().__init__()
-
-    def _validate(self):
-        # TODO: add validate function for basic type checking
-        if self._fit_transform_data_idx is None:
-            raise ValueError("Must provide _fit_transform_data_idx to fit imputer on in ImputeMissingVals stage")
-        if self._transform_data_idx is None:
-            raise ValueError("Must provide _transform_data_idx to impute in ImputeMissingVals stage")
-
-    def _get_imputer(self, strategy, fill_value):
-        imputers = {
-            'constant': SimpleImputer(strategy=strategy, fill_value=fill_value),
-            'most_frequent': SimpleImputer(strategy=strategy),
-            'mean': SimpleImputer(strategy=strategy),
-            'median': SimpleImputer(strategy=strategy),
-            }
-        if strategy not in imputers.keys():
-            self.logError("strategy arg must be one of {}".format(imputers.keys()))
-        self.logInfo("Imputer strategy selected as {}".format(strategy))
-        return imputers[strategy]
 
     def set_fit_transform_data_idx(self, fit_transform_data_idx):
         self._fit_transform_data_idx = fit_transform_data_idx
@@ -48,93 +21,137 @@ class ImputeMissingVals(PreprocessingStageBase):
     def set_transform_data_idx(self, transform_data_idx):
         self._transform_data_idx = transform_data_idx
 
+    def _validate(self):
+        if self._fit_transform_data_idx is None:
+            raise ValueError("set_fit_transform_data_idx must be called for preprocessing stages")
+        if self._transform_data_idx is None:
+            raise ValueError("set_transform_data_idx must be called for preprocessing stages")
+
+
+class ImputerPreprocessingStage(PreprocessingStageBase):
+    def __init__(self, cols, strategy, fill_value=None): 
+        super().__init__()
+        self._cols = cols
+        self._strategy = strategy.lower()
+        self._fill_value = fill_value
+
+    def _validate(self):
+        super()._validate()
+        if self._get_imputer() is None:
+            raise ValueError("Unknown strategy passed to {}".format(type(self).__name__))
+
+    def _get_imputer(self):
+        if self._strategy not in self._valid_imputers:
+            return None
+        else:
+            return SimpleImputer(strategy=self._strategy, fill_value=self._fill_value)
+
     def execute(self, dc):
-        imputer = self._get_imputer(self.strategy, self.fill_value)
-        self.logInfo("Imputing missing values for columns: {}".format(self.cols))
+        self._validate()
+        imputer = self._get_imputer()
+        self.logInfo("Imputing missing values for columns: {}".format(self._cols))
         X = dc.get_item('data')
-        data_to_impute = X[self.cols]
-        fit_transform_data = data_to_impute.map_partitions(lambda x: x[x.index.isin(self._fit_transform_data_idx.compute())])
+        data_to_impute = X[self._cols]
+        fit_transform_data = data_to_impute.map_partitions(lambda x: x[x.index.isin(data_to_impute.index.compute()[self._fit_transform_data_idx.compute()])])
         imputer = imputer.fit(fit_transform_data)
         fit_transform_data = imputer.transform(fit_transform_data)
-        transform_data = data_to_impute.map_partitions(lambda x: x[x.index.isin(self._transform_data_idx.compute())])
+        transform_data = data_to_impute.map_partitions(lambda x: x[x.index.isin(data_to_impute.index.compute()[self._transform_data_idx.compute()])])
         transform_data = imputer.transform(transform_data)
+        fit_transform_data.compute()
+        transform_data.compute()
+        X.loc[self._fit_transform_data_idx, self._cols] = fit_transform_data   # TODO: make this dask compatible
+        X.loc[self._transform_data_idx, self._cols] = transform_data
+        dc.set_item('data', X)
+        return dc
+
+ImputerPreprocessingStage._valid_imputers = ['mean', 'median', 'most_frequent', 'constant']
+
+
+class FeatureScalerPreprocessingStage(PreprocessingStageBase):
+    _scalers = {
+        'min-max': lambda feat_range: MinMaxScaler(feature_range=feat_range),
+        'standardize': lambda dummy: StandardScaler()
+        }
+
+    def __init__(self, cols, strategy, feature_range=(0,1)):
+        super().__init__()
+        self._cols = cols
+        self._strategy = strategy.lower()
+        self._feature_range = feature_range
+
+    def _validate(self):
+        super()._validate()
+        if self._strategy not in self._scalers.keys():
+            raise ValueError("Unknown strategy passed to {}; must be one of {}".format(type(self).__name__, self._scalers.keys()))
+
+    def _get_scaler(self):
+        self.logInfo("Scaler strategy selected as {}".format(strategy))
+        return self._scalers[self._strategy](self._feature_range)
+
+    def execute(self, dc):
+        self._validate()
+        scaler = self._get_scaler()
+        self.logInfo("Scaling values for columns: {}".format(self._cols))
+        X = dc.get_item('data')
+        data_to_scale = X[self._cols]
+        fit_transform_data = data_to_scale.map_partititons(lambda x: x[x.index.isin(self._fit_transform_data_idx.computer())])
+        scaler = scaler.fit(fit_transform_data)
+        fit_transform_data = scaler.transform(fit_transform_data)
+        transform_data = data_to_scale.map_partitions(lambda x: x[x.index.isin(self._transform_data_idx.compute())])
+        transform_data = scaler.transform(transform_data)
         fit_transform_data.compute()
         transform_data.compute()
         X.loc[self._fit_transform_data_idx, self.cols] = fit_transform_data   # TODO: make this dask compatible
         X.loc[self._transform_data_idx, self.cols] = transform_data
         dc.set_item('data', X)
         return dc
-
-
-class FeatureScaler(PreprocessingStageBase):
-    def __init__(self, cols, strategy, feature_range=(0,1)):
-        self.cols = cols
-        self.strategy = strategy.lower()
-        self.feature_range = feature_range
-        super().__init__()
-
-    def _get_scaler(self, strategy, feature_range):
-        scalers = {
-            'min-max': MinMaxScaler(feature_range=feature_range),
-            'standardize': StandardScaler()
-            }
-        if strategy not in scalers.keys():
-            self.logError("strategy arg must be one of {}".format(scalers.keys()))
-        self.logInfo("Scaler strategy selected as {}".format(strategy))
-        return scalers[strategy]
-
-    def execute(self, dc):
-        scaler = self._get_scaler(self.strategy, self.feature_range)
-        self.logInfo("Scaling values for columns: {}".format(self.cols))
-        X = dc.get_item('data')
-        cols_to_scale = X[self.cols]
-        scaler = scaler.fit(cols_to_scale)
-        scaled_cols = scaler.transform(cols_to_scale)
-        scaled_cols.compute()
-        X[self.cols] = scaled_cols
-        dc.set_item('data', X)
-        return dc
-    
     
     
 class EncodeLabels(PreprocessingStageBase):
     def __init__(self, cols, strategy):
-        self.cols = cols
-        self.strategy = strategy.lower()
         super().__init__()        
+        self._cols = cols
+        self._strategy = strategy.lower()
+
+    def _validate(self):
+        # Intentionally commented out.  No fit or transform indices are required
+        #super()._validate()
+        if self._strategy not in self._encoders.keys():
+            raise ValueError("Unknown strategy passed to {}; must be one of {}".format(type(self).__name__, self._encoders.keys()))
+
+    @classmethod
+    def _one_hot_encode(cls, df, cols):
+        for col in cols:
+            encoder = OneHotEncoder()
+            col_to_encode = df[[col]].astype('category').categorize()
+            encoded_cols = encoder.fit_transform(col_to_encode)
+            for c in encoded_cols:
+                df[c] = encoded_cols[c]
+            df = df.drop(col, axis=1)
+        return df
+
+    @classmethod
+    def _label_encode(cls, df, cols):
+        for col in cols:
+            encoder = LabelEncoder()
+            encoded_col = encoder.fit_transform(df[col])
+            df[col] = encoded_col
+        return df
         
-    def _get_encoder(self, strategy):
-        #
-        def _one_hot_encode(df, cols):
-            for col in cols:
-                encoder = OneHotEncoder()
-                col_to_encode = df[[col]].astype('category').categorize()
-                encoded_cols = encoder.fit_transform(col_to_encode)
-                for c in encoded_cols:
-                    df[c] = encoded_cols[c]
-                df = df.drop(col, axis=1)
-            return df
-        
-        def _label_encode(df, cols):
-            for col in cols:
-                encoder = LabelEncoder()
-                encoded_col = encoder.fit_transform(df[col])
-                df[col] = encoded_col
-            return df
-            
-        encoders = {
-            'onehotencoder': _one_hot_encode,
-            'labelencoder': _label_encode
-            }
-        if strategy not in encoders.keys():
-            self.logError("Encoder arg must be one of {}".format(encoders.keys()))
-        self.logInfo("Encoder strategy selected as {}".format(strategy))
-        return encoders[strategy]
+    def _get_encoder(self):
+        self.logInfo("Label encoder strategy selected as {}".format(self._strategy))
+        return self._encoders[self._strategy]
             
     def execute(self, dc):
-        self.logInfo("Encoding labels for columns: {}".format(self.cols))
+        self._validate()
+        encoder = self._get_encoder()
+        self.logInfo("Encoding labels for columns: {}".format(self._cols))
         X = dc.get_item('data')
-        encoder = self._get_encoder(self.strategy)
-        X = encoder(X, self.cols)
+        X = encoder(X, self._cols)
         dc.set_item('data', X)
         return dc
+
+EncodeLabels._encoders = {
+    'onehotencoder': EncodeLabels._one_hot_encode,
+    'labelencoder': EncodeLabels._label_encode
+}

@@ -1,9 +1,9 @@
 from collections.abc import Iterable, Mapping
 
-from dask.dataframe import dataframe as dd
+from dask import dataframe as dd
 from sklearn.metrics import get_scorer
 from tensorflow.keras.losses import get as get_loss
-from tensorflow.keras.optimizer import get as get_optimizer
+#from tensorflow.keras.optimizer import get as get_optimizer
 
 from model import ModelBase, SklearnModel, TensorFlowModel
 from utils import get_sklearn_scoring_func, get_tensorflow_loss_func, get_tensorflow_metric_func
@@ -40,25 +40,25 @@ class TrainPredictContext():
 class SupervisedTrainPredictContext(TrainPredictContext):
 	def __init__(self):
 		super().__init__()
-		self._ylabel = None
+		self._y_label = None
 
     #move getter and setter for y labels to main class (but then what is unique about this class?)
-	def get_ylabel(self):
-		return self._ylabel
+	def get_y_label(self):
+		return self._y_label
 
-	def set_ylabel(self, labels):
+	def set_y_label(self, labels):
 		if isinstance(labels, str) or isinstance(labels, Iterable):
-			self._ylabel = labels
+			self._y_label = labels
 		else:
 			raise ValueError('labels argument must be Iterable or string type')
 
 	def validate(self):
 		super().validate()
-		if not isinstance(self.ylabel, str) or not isinstance(self.ylabel, Iterable):
-			raise TypeError("ylabel must be initialized to Iterable or string type")
+		if not isinstance(self.y_label, str) or not isinstance(self.y_label, Iterable):
+			raise TypeError("y_label must be initialized to Iterable or string type")
 		return True
 
-	ylabel = property(get_ylabel, set_ylabel)
+	y_label = property(get_y_label, set_y_label)
 
 
 class SupervisedTrainParamGridContext(SupervisedTrainPredictContext):
@@ -136,7 +136,7 @@ class SklearnSupervisedTrainParamGridContext(SupervisedTrainParamGridContext):
 	param_eval_func = property(get_param_eval_func, set_param_eval_func)
 
 
-class TensorFlowSupervisedTrainParamGridContext(SupervisedTrainPredictContext):
+class TensorFlowSupervisedTrainParamGridContext(SupervisedTrainParamGridContext):
 	def __init__(self):
 		super().__init__()
 		self._optimizer = None
