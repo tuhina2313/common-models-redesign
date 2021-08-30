@@ -1,15 +1,16 @@
 import os
 import sys
+import copy
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
 from stage_base import StageBase
 from pipeline import Pipeline
-from model_training import ModelTrainingStage
+from model_training import ModelPredictionStage, ModelTrainingStage
 from preprocessing import PreprocessingStageBase
 from load_data import LoadDataFromMemory
 from training_context import SupervisedTrainParamGridContext
 from evaluation_stage import EvaluationStage
 
-from dask_ml.model_selection import KFold
+from sklearn.model_selection import KFold
 import joblib
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
@@ -56,14 +57,14 @@ class GenerateCVFoldsStage(StageBase):
     #     return strategy_checks[self.strategy](self.strategy_args)
         
     def _generate_splits(self, data):
-        kf = KFold(n_splits=self._k_folds, shuffle=False, random_state=self._strategy_args['seed'])
+        kf = KFold(n_splits=self._k_folds, shuffle=True, random_state=self._strategy_args['seed'])
         return [x for x in kf.split(data)]
     
     def execute(self, dc):
         self.logInfo("Generating CV Folds")
         X = dc.get_item('data')
         if self._strategy == 'random':
-            splits = self._generate_splits(X.to_dask_array(lengths=True))
+            splits = self._generate_splits(X)
         elif self._strategy == 'stratified':
             # TODO: Stratified CV Folds
             raise RuntimeError("Stratified CV Folds not yet implemented")
@@ -77,6 +78,7 @@ class GenerateCVFoldsStage(StageBase):
 # Treats each subset in the data partition as a test set and remaining data as training set. 
 # Uses cross validation to make predictions on each test set. 
 # Does not tune hyperparameters.
+# TODO: handle multiple parameters in param_grid and generate average performance across folds in the output
 class CrossValidationStage(StageBase):
     def __init__(self):
         super().__init__()
@@ -110,22 +112,17 @@ class CrossValidationStage(StageBase):
             cols.append(self._training_context.y_label)
 
         cv_splits = dc.get_item("cv_splits")
-        cv_results = {
-            'predictions': (len(cv_splits[0][0] + len(cv_splits[0][1])))*[np.nan] 
-            # TODO initialize prediction vector wrt to classification (int)/regression (float) arg provided by user
-            }
+        combined_preds = np.array((len(cv_splits[0][0]) + len(cv_splits[0][1]))*[np.nan])
         
         for i in range(len(cv_splits)):
             self.logInfo("Running CV for fold {}".format(i))
             split = cv_splits[i]
             train_idx, test_idx = split
-            train_idx = train_idx.compute()
-            test_idx = test_idx.compute()
             data = dc.get_item('data')
             data = data[cols]  # x and y cols
 
-            data_train = data.map_partitions(lambda x: x[x.index.isin(train_idx)]) # TODO: can we move compute elsewhere to improve speed?
-            data_test = data.map_partitions(lambda x: x[x.index.isin(test_idx)])
+            data_train = data.iloc[train_idx, :]
+            data_test = data.iloc[test_idx, :]
 
             # unpack training_context
             param_grid = self._training_context.param_grid
@@ -136,13 +133,13 @@ class CrossValidationStage(StageBase):
             
             p = Pipeline()
             #self._pipeline.setLoggingPrefix('CrossValidationStage: ')
-            p.addStage(LoadDataFromMemory(data))
+            p.addStage(LoadDataFromMemory(data, reset_index=True))
             for stage in self._preprocessing_stages:
                 stage.set_fit_transform_data_idx(train_idx)
                 stage.set_transform_data_idx(test_idx)
                 p.addStage(stage)
             #p.addStage(LoadTrainTestFoldStage(train_idx, test_idx))
-            cv_stage_context = SupervisedTrainParamGridContext()
+            cv_stage_context = copy.deepcopy(self._training_context)
             cv_stage_context.param_grid = param_grid
             training_stage = ModelTrainingStage(train_idx)
             training_stage.setTrainingContext(cv_stage_context)
@@ -153,14 +150,13 @@ class CrossValidationStage(StageBase):
             p.run()
             dc = p.getDC()
             preds = dc.get_item('predictions')
-            cv_results['predictions'][test_idx] = preds
+            combined_preds[test_idx] = preds
 
-        dc['training_results'] = cv_results
+        dc.set_item('predictions', combined_preds)
 
         return dc
 
 
-# TODO: This does not tune hyperparameters yet and shouldn't be used until it's implemented 
 # Note: default to avg across parameter grid
 class NestedCrossValidationTrainingStage(StageBase):
     def __init__(self):
@@ -179,6 +175,8 @@ class NestedCrossValidationTrainingStage(StageBase):
             raise ValueError("setValidationCVFoldsStage requires GenerateCVFoldsStage arg type")
         if not issubclass(type(self._training_context), SupervisedTrainParamGridContext):
             raise ValueError("setTrainingContext requires SupervisedTrainParamGridContext arg type")
+        if len(self._training_context.eval_funcs) > 1:
+            raise ValueError("Multiple evaluation metrics not supported")
         return
 
     def _createIterableParameterGrid(self, param_grid):
@@ -208,57 +206,64 @@ class NestedCrossValidationTrainingStage(StageBase):
 
         cv_splits = dc.get_item("cv_splits")
         nested_cv_results = {
-            'results_per_fold':{},
-            'results': {},
-            'predictions': (len(cv_splits[0][0] + len(cv_splits[0][1])))*[np.nan]
+            'results_per_fold': [],
+            'results_avg': {},
+            'predictions': np.array((len(cv_splits[0][0]) + len(cv_splits[0][1]))*[np.nan])
             # TODO initialize prediction vector wrt to classification (int)/regression (float) arg provided by user
             }
         
-        
+        data = dc.get_item('data')
+        data = data[cols]  # x and y cols
         for i in range(len(cv_splits)):
             split = cv_splits[i]
             train_idx, test_idx = split
-            data = dc.get_item('data')
-            data = data[cols]  # x and y cols
             # map data to CV partitions
-            data_train = data.map_partitions(lambda x: x[x.index.isin(train_idx.compute())]) # TODO: can we move compute elsewhere to improve speed?
-            data_test = data.map_partitions(lambda x: x[x.index.isin(test_idx.compute())])
+            data_train = data.iloc[train_idx, :]
+            data_test = data.iloc[test_idx, :]
 
             # upack training_context
             param_grid = self._createIterableParameterGrid(self._training_context.param_grid)
-            eval_func = self._training_context.param_eval_func
+            eval_func = self._training_context.eval_funcs[0] # TODO: handle multiple functions?
             eval_goal = self._training_context.param_eval_goal
+            eval_func_name = self._training_context.get_eval_func_names()[0] # TODO - see above
             
             param_grid_eval_results = []
             for point in param_grid:
                 p = Pipeline()
-                p.addStage(LoadDataFromMemory(data_train))
-                for stage in self._preprocessing_stages:
-                    stage.set_fit_transform_data_idx(train_idx)
-                    stage.set_transform_data_idx(test_idx)
-                    p.addStage(stage)
+                p.addStage(LoadDataFromMemory(data_train, reset_index=True))
+                #for stage in self._preprocessing_stages:
+                #    stage.set_fit_transform_data_idx(train_idx)
+                #    stage.set_transform_data_idx(test_idx)
+                #    p.addStage(stage)
                 p.addStage(self._validation_cv_stage)
-                cv_stage_context = SupervisedTrainParamGridContext()
+                cv_stage_context = copy.deepcopy(self._training_context)
                 cv_stage_context.param_grid = point
                 cv_stage = CrossValidationStage()
                 cv_stage.setTrainingContext(cv_stage_context)
+                for stage in self._preprocessing_stages:
+                    cv_stage.addPreprocessingStage(stage)
                 p.addStage(cv_stage)
-                p.addStage(EvaluationStage(eval_func))
+                eval_stage = EvaluationStage()
+                eval_stage.setTrainingContext(self._training_context)
+                p.addStage(eval_stage)
                 p.run()
                 dc = p.getDC()
-                eval_result = dc.get_item('model_evaluation_results')[eval_func]
+                eval_result = dc.get_item('evaluation_results')[eval_func_name]
                 param_grid_eval_results.append((point, eval_result))  #TODO: update "point" as dictionary
 
             param_grid_eval_results.sort(key=lambda x: x[1], reverse=(eval_goal=='max'))
             best_point = param_grid_eval_results[0]
+
             # store results in dict - described below
-            nested_cv_results['results_per_fold'][i]['param_grid_results'] = param_grid_eval_results
-            nested_cv_results['results_per_fold'][i]['best_params'] = best_point
+            fold_results = {}
+            fold_results['param_grid_results'] = param_grid_eval_results
+            fold_results['best_params'] = best_point
+            nested_cv_results['results_per_fold'].append(fold_results)
         
         # results_all_folds acts a temp object for computing averages
         results_all_folds = []
-        for key, value in nested_cv_results['results_per_fold']:
-            for p, p_val in value['param_grid_results']:
+        for fold_result in nested_cv_results['results_per_fold']:
+            for p, p_val in fold_result['param_grid_results']:
                 all_ps = [x[0] for x in results_all_folds] # Get out all points that have been seen so far
                 if p in all_ps:
                     p_index = all_ps.index(p)
@@ -270,11 +275,13 @@ class NestedCrossValidationTrainingStage(StageBase):
         for p_results in results_all_folds:
             avg = np.mean(p_results[1])
             avg_results.append((p_results[0], avg))
-        avg_results(key = lambda x: x[1], reverse=(eval_goal=='max'))
-        nested_cv_results['results']['average_param_grid_results'] = avg_results
-        nested_cv_results['results']['best_avg_params'] = avg_results[0]
+        avg_results.sort(key = lambda x: x[1], reverse=(eval_goal=='max'))
+        nested_cv_results['results_avg']['average_param_grid_results'] = avg_results
+        nested_cv_results['results_avg']['best_avg_params'] = avg_results[0]
         
-        dc['training_results'] = nested_cv_results
+        # TODO - Use the per-fold results for the best param set and create a predictions vector to store in nested_cv_results
+
+        dc.set_item('training_results', nested_cv_results)
         
         return dc
 

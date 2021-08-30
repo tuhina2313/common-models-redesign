@@ -2,7 +2,6 @@ import os
 import sys
 from stage_base import StageBase
 from sklearn.model_selection import train_test_split
-from dask_ml.model_selection import KFold
 
 #in development
 

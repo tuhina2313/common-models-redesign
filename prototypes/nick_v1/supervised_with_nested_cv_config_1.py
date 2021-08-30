@@ -8,7 +8,6 @@ from evaluation_stage import EvaluationStage
 from model import SklearnModel, TensorFlowModel
 from training_context import SklearnSupervisedTrainParamGridContext, TensorFlowSupervisedTrainParamGridContext
 
-from dask.distributed import Client
 from sklearn.ensemble import RandomForestClassifier
 import tensorflow as tf
 from tensorflow import keras
@@ -53,8 +52,8 @@ train_context_skm = SklearnSupervisedTrainParamGridContext()
 train_context_skm.model = skm
 train_context_skm.feature_cols = cols
 train_context_skm.y_label = categorical_cols
+train_context_skm.eval_funcs = 'accuracy'
 train_context_skm.param_grid = {'n_estimators': [10,100,1000], 'max_depth': [1,10,None]}
-train_context_skm.param_eval_func = 'accuracy'
 train_context_skm.param_eval_goal = 'max'
 
 # init training context for tensorflow supervised model with nested CV params
@@ -62,8 +61,8 @@ train_context_tfm = TensorFlowSupervisedTrainParamGridContext()
 train_context_tfm.model = tfm
 train_context_tfm.feature_cols = cols
 train_context_tfm.y_label = categorical_cols
+train_context_tfm.eval_funcs = 'categorical_crossentropy'
 train_context_tfm.param_grid = {'hidden_layer_size': [3,4,5,6]}
-train_context_tfm.param_eval_func = 'categorical_crossentropy'
 train_context_tfm.param_eval_goal = 'max'
 train_context_tfm.optimizer = 'sgd'
 
@@ -76,7 +75,9 @@ s3.addPreprocessingStage(ImputerPreprocessingStage(cols, 'constant', fill_value=
 s3.addPreprocessingStage(FeatureScalerPreprocessingStage(cols, 'min-max'))
 # s3.add_stage(TransformFeaturesStage(NGramTransformer(col='transcript'))) # example n-gram feature transformer stage
 
-s4 = EvaluationStage(['roc_auc', 'accuracy'])
+s4 = EvaluationStage()
+#train_context_skm.eval_funcs = ['accuracy', 'roc_auc']
+s4.setTrainingContext(train_context_skm)
 
 
 p = Pipeline()
@@ -88,7 +89,11 @@ p.addStage(s4)
 p.run()
 
 
+best_params = p.getDC().get_item('training_results')['results_avg']['best_avg_params']
 
+print("Best params: {}".format(best_params[0]))
+print("Best param average performance: {}".format(best_params[1]))
+print("TODO: Get the predictions and within-sample evaluation performance")
 
 
 

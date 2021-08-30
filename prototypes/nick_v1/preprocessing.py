@@ -3,8 +3,8 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
 from stage_base import StageBase
 
-from dask_ml.preprocessing import MinMaxScaler, StandardScaler, OneHotEncoder, LabelEncoder
-from dask_ml.impute import SimpleImputer
+from sklearn.preprocessing import MinMaxScaler, StandardScaler, OneHotEncoder, LabelEncoder
+from sklearn.impute import SimpleImputer
 
 
 
@@ -52,14 +52,12 @@ class ImputerPreprocessingStage(PreprocessingStageBase):
         self.logInfo("Imputing missing values for columns: {}".format(self._cols))
         X = dc.get_item('data')
         data_to_impute = X[self._cols]
-        fit_transform_data = data_to_impute.map_partitions(lambda x: x[x.index.isin(data_to_impute.index.compute()[self._fit_transform_data_idx.compute()])])
+        fit_transform_data = data_to_impute.iloc[self._fit_transform_data_idx, :]
         imputer = imputer.fit(fit_transform_data)
         fit_transform_data = imputer.transform(fit_transform_data)
-        transform_data = data_to_impute.map_partitions(lambda x: x[x.index.isin(data_to_impute.index.compute()[self._transform_data_idx.compute()])])
+        transform_data = data_to_impute.iloc[self._transform_data_idx, :]
         transform_data = imputer.transform(transform_data)
-        fit_transform_data.compute()
-        transform_data.compute()
-        X.loc[self._fit_transform_data_idx, self._cols] = fit_transform_data   # TODO: make this dask compatible
+        X.loc[self._fit_transform_data_idx, self._cols] = fit_transform_data
         X.loc[self._transform_data_idx, self._cols] = transform_data
         dc.set_item('data', X)
         return dc
@@ -85,7 +83,7 @@ class FeatureScalerPreprocessingStage(PreprocessingStageBase):
             raise ValueError("Unknown strategy passed to {}; must be one of {}".format(type(self).__name__, self._scalers.keys()))
 
     def _get_scaler(self):
-        self.logInfo("Scaler strategy selected as {}".format(strategy))
+        self.logInfo("Scaler strategy selected as {}".format(self._strategy))
         return self._scalers[self._strategy](self._feature_range)
 
     def execute(self, dc):
@@ -94,15 +92,13 @@ class FeatureScalerPreprocessingStage(PreprocessingStageBase):
         self.logInfo("Scaling values for columns: {}".format(self._cols))
         X = dc.get_item('data')
         data_to_scale = X[self._cols]
-        fit_transform_data = data_to_scale.map_partititons(lambda x: x[x.index.isin(self._fit_transform_data_idx.computer())])
+        fit_transform_data = data_to_scale.iloc[self._fit_transform_data_idx, :]
         scaler = scaler.fit(fit_transform_data)
         fit_transform_data = scaler.transform(fit_transform_data)
-        transform_data = data_to_scale.map_partitions(lambda x: x[x.index.isin(self._transform_data_idx.compute())])
+        transform_data = data_to_scale.iloc[self._transform_data_idx, :]
         transform_data = scaler.transform(transform_data)
-        fit_transform_data.compute()
-        transform_data.compute()
-        X.loc[self._fit_transform_data_idx, self.cols] = fit_transform_data   # TODO: make this dask compatible
-        X.loc[self._transform_data_idx, self.cols] = transform_data
+        X.loc[self._fit_transform_data_idx, self._cols] = fit_transform_data
+        X.loc[self._transform_data_idx, self._cols] = transform_data
         dc.set_item('data', X)
         return dc
     

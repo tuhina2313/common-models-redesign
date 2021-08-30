@@ -8,9 +8,6 @@ from evaluation_stage import EvaluationStage
 
 from sklearn.ensemble import RandomForestClassifier
 
-from dask.distributed import Client
-
-
 import tensorflow as tf
 from tensorflow import keras
 

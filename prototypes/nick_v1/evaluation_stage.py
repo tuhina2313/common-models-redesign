@@ -3,40 +3,34 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
 from stage_base import StageBase
 
-from utils import get_sklearn_scoring_func as get_eval_func
-
 class EvaluationStage(StageBase):
-    def __init__(self, methods):
+    def __init__(self):
         super().__init__()
-        try: # Force methods to be an iterable
-            iter(methods)
-            self._methods = methods
-        except:
-            self._methods = [methods]
-        self._eval_funcs = []
-        try:
-            for method in methods:
-                eval_func = method
-                if not callable(eval_func):
-                    eval_func = get_eval_func(method)
-                self._eval_funcs.append(eval_func)
-        except:
-            self.logError("Unable to map input methods '{}' to an evaluation function".format(methods))
-            self._eval_funcs = None
-        super().__init__()
+        self._training_context = None
+
+    def setTrainingContext(self, trainingContext):
+        self._training_context = trainingContext
+
+    def _validate(self, dc):
+        if not issubclass(self._training_context, SupervisedTrainPredEvalContext):
+            raise ValueError("Training context must be a subclass of {}".format(type(SupervisedTrainPredEvalContext).__name__))
+        if not isinstance(self._training_context.ylabel, str) and len(self._training_context.y_label) > 1:
+            raise ValueError("Multi-target evaluation is not supported yet.  Ensure only one label is provided to {}".format(type(self).__name__))
 
     def execute(self, dc):
         self.logInfo("Running Model Evaluation Stage")
         data = dc.get_item('data')
-        preds = dc.get_item('model_predictions')
-        training_context = dc.get_item('training_context')
+        preds = dc.get_item('predictions')
+        eval_func_names = self._training_context.get_eval_func_names()
         eval_results = {}
 
-        for i in range(len(self._methods)):
-            method = self._methods[i]
-            eval_func = self._eval_funcs[i]
-            eval_value = eval_func(data[training_context.y_label], preds)
-            eval_results[method] = eval_value
+        y_label = self._training_context.y_label # TODO: support multi-target labels
+
+        for i in range(len(self._training_context.eval_funcs)):
+            eval_func = self._training_context.eval_funcs[i]
+            eval_labels = data[y_label]
+            eval_value = eval_func(eval_labels, preds)
+            eval_results[eval_func_names[i]] = eval_value
         
-        dc.set_item('model_evaluation_results', eval_results)
+        dc.set_item('evaluation_results', eval_results)
         return dc

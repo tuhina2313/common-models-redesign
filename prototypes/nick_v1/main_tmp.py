@@ -3,8 +3,6 @@ import sys
 
 from sklearn.ensemble import RandomForestClassifier
 
-from dask.distributed import Client
-
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
 from load_data import CSVReader
 from preprocessing import ImputeMissingVals, FeatureScaler, EncodeLabels
