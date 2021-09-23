@@ -1,13 +1,13 @@
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
-from stage_base import StageBase
-from pipeline import Pipeline
+from stage_base import Stage
+from pipeline import PipelineStage
 from sklearn.model_selection import KFold
 
-class CrossValidationStage(StageBase):
+class CrossValidationStage(Stage):
     def __init__(self):
-        self._pipeline = Pipeline()
+        self._pipeline = PipelineStage()
         super().__init__()
         self._pipeline.setLoggingPrefix('CrossValidationStage: ')
         self.setLoggingPrefix('CrossValidationStage: ')

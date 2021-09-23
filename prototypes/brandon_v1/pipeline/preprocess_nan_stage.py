@@ -2,10 +2,10 @@ import os
 import sys
 import numpy as np
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
-from stage_base import StageBase
+from stage_base import Stage
 
 
-class PreprocessNanStage(StageBase):
+class PreprocessNanStage(Stage):
     def execute(self):
         self._outputData = self._inputData
         nan_rows = (self._inputData.train_data.isna().sum(axis=1) > 0).values.flatten()

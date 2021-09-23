@@ -1,7 +1,7 @@
-from load_data import CSVReader
-from preprocessing import ImputeMissingVals, FeatureScaler, EncodeLabels
-from pipeline import Pipeline
-from cross_validation import GenerateCVFolds, NestedCrossValidationTrainingStage
+from load_data import CSVReaderDataLoaderStage
+from preprocessing import ImputeMissingValsPreprocessingStage, FeatureScalerPreprocessingStage, EncodeLabelsPreprocessingStage
+from pipeline import PipelineStage
+from cross_validation import GenerateCVFoldsStage, NestedCrossValidationTrainingStage
 from model_training import ModelTrainingStage
 from evaluation_stage import EvaluationStage
 
@@ -40,14 +40,14 @@ tfm.set_model_create_func(my_tf_model_func)
 
 data_dir = '../../sample_data'
 filename = 'iris_data_w_nans.csv'
-s0 = CSVReader(data_dir, filename)
+s0 = CSVReaderDataLoaderStage(data_dir, filename)
 
 cols = ['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)']
 categorical_cols = ['species']
 
-s1 = EncodeLabels(categorical_cols, 'labelencoder')
+s1 = EncodeLabelsPreprocessingStage(categorical_cols, 'labelencoder')
 
-s2 = GenerateCVFolds(k_folds=5, strategy='random', strategy_args={'seed':42}) 
+s2 = GenerateCVFoldsStage(k_folds=5, strategy='random', strategy_args={'seed':42}) 
 
 
 # init training context for sklearn supervised model with nested CV params
@@ -71,16 +71,16 @@ train_context_tfm.optimizer = 'sgd'
 
 
 s3 = NestedCrossValidationTrainingStage(train_context_skm)
-validation_folds = GenerateCVFolds(k_folds=3, strategy='random', strategy_args={'seed':42})
+validation_folds = GenerateCVFoldsStage(k_folds=3, strategy='random', strategy_args={'seed':42})
 s3.setValidationCVFoldsStage(validation_folds)
-s3.addPreprocessingStage(ImputeMissingVals(cols, 'constant', fill_value=0))
-s3.addPreprocessingStage(FeatureScaler(cols, 'min-max'))
+s3.addPreprocessingStage(ImputeMissingValsPreprocessingStage(cols, 'constant', fill_value=0))
+s3.addPreprocessingStage(FeatureScalerPreprocessingStage(cols, 'min-max'))
 # s3.add_stage(TransformFeaturesStage(NGramTransformer(col='transcript'))) # example n-gram feature transformer stage
 
 s4 = EvaluationStage(['auroc', 'accuracy', 'auprc'])
 
 
-p = Pipeline()
+p = PipelineStage()
 p.add_stage(s1)
 p.add_stage(s2)
 p.add_stage(s3)

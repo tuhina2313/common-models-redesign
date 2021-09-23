@@ -1,20 +1,20 @@
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
-from stage_base import StageBase
+from stage_base import Stage
 
 from dask_ml.preprocessing import MinMaxScaler, StandardScaler, OneHotEncoder, LabelEncoder
 from dask_ml.impute import SimpleImputer
 
 
 
-class PreprocessingStageBase(StageBase):
+class PreprocessingStage(Stage):
     def __init__(self):
         super().__init__()
         self.setLoggingPrefix('PreprocessingStage: ')
 
 
-class ImputeMissingVals(PreprocessingStageBase):
+class ImputeMissingValsPreprocessingStage(PreprocessingStage):
     def __init__(self, cols, strategy, fill_value=None): 
         self.cols = cols
         self.strategy = strategy.lower()
@@ -26,9 +26,9 @@ class ImputeMissingVals(PreprocessingStageBase):
     def _validate(self):
         # TODO: add validate function for basic type checking
         if self._fit_transform_data_idx is None:
-            raise ValueError("Must provide _fit_transform_data_idx to fit imputer on in ImputeMissingVals stage")
+            raise ValueError("Must provide _fit_transform_data_idx to fit imputer on in ImputeMissingValsPreprocessingStage stage")
         if self._transform_data_idx is None:
-            raise ValueError("Must provide _transform_data_idx to impute in ImputeMissingVals stage")
+            raise ValueError("Must provide _transform_data_idx to impute in ImputeMissingValsPreprocessingStage stage")
 
     def _get_imputer(self, strategy, fill_value):
         imputers = {
@@ -66,7 +66,7 @@ class ImputeMissingVals(PreprocessingStageBase):
         return dc
 
 
-class FeatureScaler(PreprocessingStageBase):
+class FeatureScalerPreprocessingStage(PreprocessingStage):
     def __init__(self, cols, strategy, feature_range=(0,1)):
         self.cols = cols
         self.strategy = strategy.lower()
@@ -97,7 +97,7 @@ class FeatureScaler(PreprocessingStageBase):
     
     
     
-class EncodeLabels(PreprocessingStageBase):
+class EncodeLabelsPreprocessingStage(PreprocessingStage):
     def __init__(self, cols, strategy):
         self.cols = cols
         self.strategy = strategy.lower()

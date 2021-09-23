@@ -1,4 +1,4 @@
-Add pure abstract method `validate` to StageBase
+Add pure abstract method `validate` to Stage
  - Reasoning: Force future devs to consciously choose whether/how to validate their stages
  - Consider ways to enforce `validate` method call somewhere in the `execute` for all subclasses
  	- example where this would be helpful: EvaluationStage
@@ -18,14 +18,14 @@ Update ModelTrainingStage
  Update CrossValidationStage
   - should accept training context
 
-Finish GenerateCVFolds functionality
+Finish GenerateCVFoldsStage functionality
 
 
 Initialize prediction vector wrt to classification (int)/regression (float) arg provided by user (in cross_validation.py)
 
 
 Add in functionality to preprocessing.py stages to fit transformers on train data (_fit_transform_data_idx) and then transform full data set of cols
-    NOTE - this has been implemented (not tested) in the ImputeMissingVals class
+    NOTE - this has been implemented (not tested) in the ImputeMissingValsPreprocessingStage class
 
 Complete TODOs in cross_validation.py execute method
     We need a way of specifying what the train/test folds are and then add that information to the pipeline without using the context

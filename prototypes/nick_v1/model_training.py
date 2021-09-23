@@ -10,7 +10,7 @@ import pandas as pd
 import dask.dataframe as dd
 import dask.array as da
 
-from stage_base import StageBase
+from stage_base import Stage
 
 from scikeras.wrappers import KerasClassifier
 
@@ -19,7 +19,7 @@ from scikeras.wrappers import KerasClassifier
 
 #CLASS DESCRIPTION:
 # trains on training data(in dc)
-class ModelTrainingStage(StageBase):
+class ModelTrainingStage(Stage):
     def __init__(self, m_name, model, train_X, train_y, test_X, test_y):
         self.m_name = m_name
         self.model = model
@@ -46,7 +46,7 @@ class ModelTrainingStage(StageBase):
 
 
 
-class NNModelTrainingStage(StageBase):
+class NNModelTrainingStage(Stage):
     def __init__(self):
         self.m_name = 'NN_mnist_fashion'
         self.model = None

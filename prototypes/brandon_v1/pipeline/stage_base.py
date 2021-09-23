@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'logging'))
 from logger import Logger
 
-class StageBase(ABC):
+class Stage(ABC):
     def __init__(self):
         self._loggingPrefix = type(self).__name__+": "
         self._enableCaching = False # TODO

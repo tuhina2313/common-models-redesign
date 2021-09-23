@@ -6,11 +6,11 @@ from sklearn.ensemble import RandomForestClassifier
 from dask.distributed import Client
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
-from load_data import CSVReader
-from preprocessing import ImputeMissingVals, FeatureScaler, EncodeLabels
-from pipeline import Pipeline
-from cross_validation import GenerateCVFolds, CrossValidationStage
-from model_init import ModelInitializer
+from load_data import CSVReaderDataLoaderStage
+from preprocessing import ImputeMissingValsPreprocessingStage, FeatureScalerPreprocessingStage, EncodeLabelsPreprocessingStage
+from pipeline import PipelineStage
+from cross_validation import GenerateCVFoldsStage, CrossValidationStage
+from model_init import ModelInitializerStage
 from evaluation_stage import EvaluationStage
 
 def RunTmp():
@@ -18,10 +18,10 @@ def RunTmp():
         # init dataloader stage
         data_dir = '../../sample_data'
         filename = 'iris_data_w_nans.csv'
-        s0 = CSVReader(data_dir, filename)
+        s0 = CSVReaderDataLoaderStage(data_dir, filename)
 
         # model initializer
-        s1 = ModelInitializer()
+        s1 = ModelInitializerStage()
         s1.add_model(
             {
             'model': RandomForestClassifier(),
@@ -37,10 +37,10 @@ def RunTmp():
 
         # init preprocessing stages
         cols = ['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)']
-        s2 = ImputeMissingVals(cols, 'constant', fill_value=0)
-        s3 = FeatureScaler(cols, 'min-max')
+        s2 = ImputeMissingValsPreprocessingStage(cols, 'constant', fill_value=0)
+        s3 = FeatureScalerPreprocessingStage(cols, 'min-max')
         categorical_cols = ['species']
-        s4 = EncodeLabels(categorical_cols, 'labelencoder')
+        s4 = EncodeLabelsPreprocessingStage(categorical_cols, 'labelencoder')
 
         # cross-validation
         # TESTING
@@ -49,14 +49,14 @@ def RunTmp():
         #cv_strategy = CrossValidationStrategy(strategy='stratified', strategy_args=(train_test_splits=8, train_val_splits=3, cols=['gender','income']))
 
         # Generate folds
-        s5 = GenerateCVFolds(strategy='random', strategy_args=[1,2,3])
+        s5 = GenerateCVFoldsStage(strategy='random', strategy_args=[1,2,3])
 
         # Cross validation
         s6 = CrossValidationStage()
 
         s7 = EvaluationStage(method='accuracy')
 
-        p = Pipeline()
+        p = PipelineStage()
         p.addStage(s0)
         p.addStage(s1)
         p.addStage(s2)

@@ -6,13 +6,13 @@ Created on Wed Jul  7 09:55:30 2021
 
 pseudo-code for models-to-run to be used in CV & hyperparameter tuning
 """
-from stage_base import StageBase
+from stage_base import Stage
 
 from sklearn.ensemble import RandomForestClassifier
 
 from scikeras.wrappers import KerasClassifier
 
-class ModelInitializer(StageBase):
+class ModelInitializerStage(Stage):
     def __init__(self):
         self.models_to_run = []
         super().__init__()
@@ -39,7 +39,7 @@ class ModelInitializer(StageBase):
 
 # testing
 # if __name__=='__main__':
-#     models = ModelInitializer()
+#     models = ModelInitializerStage()
 #     models.add_model(
 #         model=RandomForestClassifier(),
 #         model_params={'n_estimators': [100, 200],},

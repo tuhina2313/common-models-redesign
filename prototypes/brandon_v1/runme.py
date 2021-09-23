@@ -8,7 +8,7 @@ from partition_stage import PartitionStage
 from prediction_stage import PredictionStage
 from evaluation_stage import EvaluationStage
 from cross_validation_stage import CrossValidationStage
-from pipeline import Pipeline
+from pipeline import PipelineStage
 sys.path.append(os.path.join(os.path.dirname(__file__), 'logging'))
 from logger import Logger
 sys.path.append(os.path.join(os.path.dirname(__file__), 'data'))
@@ -21,7 +21,7 @@ import numpy as np
 # Dask, for scaling ML jobs to multiple machines
 
 def DoRunPipelineTest():
-    p = Pipeline()
+    p = PipelineStage()
 
     p.addStage(PreprocessNanStage())
 

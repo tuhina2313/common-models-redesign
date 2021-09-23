@@ -1,11 +1,11 @@
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
-from stage_base import StageBase
+from stage_base import Stage
 from pipeline import Pipeline
 from model_training import ModelTrainingStage
-from preprocessing import PreprocessingStageBase
-from load_data import LoadDataFromMemory
+from preprocessing import PreprocessingStage
+from load_data import LoadDataFromMemoryDataLoaderStage
 from training_context import SupervisedTrainParamGridContext
 from evaluation_stage import EvaluationStage
 
@@ -21,7 +21,7 @@ from collections.abc import Iterable
 #TODO: Add commented descriptions of each class above Class name
 
 
-class GenerateCVFolds(StageBase):
+class GenerateCVFoldsStage(Stage):
     def __init__(self, k_folds, strategy, strategy_args):
         self._k_folds = k_folds
         self._strategy = strategy.lower()
@@ -57,7 +57,7 @@ class GenerateCVFolds(StageBase):
             # TODO: Stratified CV Folds
             raise RuntimeError("Stratified CV Folds not yet implemented")
         else:
-            raise ValueError("{} is not a supported strategy for GenerateCVFolds".format(self._strategy))
+            raise ValueError("{} is not a supported strategy for GenerateCVFoldsStage".format(self._strategy))
         dc.set_item('cv_splits', splits)
         return dc
 
@@ -66,7 +66,7 @@ class GenerateCVFolds(StageBase):
 # Treats each subset in the data partition as a test set and remaining data as training set. 
 # Uses cross validation to make predictions on each test set. 
 # Does not tune hyperparameters.
-class CrossValidationStage(StageBase):
+class CrossValidationStage(Stage):
     def __init__(self):
         self._preprocessing_stages = []
         self._training_context = None
@@ -76,8 +76,8 @@ class CrossValidationStage(StageBase):
 
     def _validate(self):
         for stage in self._preprocessing_stages:
-            if not issubclass(stage, PreprocessingStageBase):
-                raise ValueError("addPreprocessingStage only accepts PreprocessingStageBase arg type")
+            if not issubclass(stage, PreprocessingStage):
+                raise ValueError("addPreprocessingStage only accepts PreprocessingStage arg type")
         if not issubclass(self._training_context, SupervisedTrainParamGridContext):
             # TODO: check that param grid has a single point
             raise ValueError("setTrainingContext requires SupervisedTrainParamGridContext arg type")
@@ -124,7 +124,7 @@ class CrossValidationStage(StageBase):
                     param_grid[k] = item
             
             p = Pipeline()
-            p.addStage(LoadDataFromMemory(data_train))
+            p.addStage(LoadDataFromMemoryDataLoaderStage(data_train))
             for stage in self._preprocessing_stages:
                 p.addStage(stage)
             cv_stage_context = SupervisedTrainParamGridContext()
@@ -175,7 +175,7 @@ class CrossValidationStage(StageBase):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #TODO: delete this class?
 # Note: default to avg across parameter grid
-class NestedCrossValidationTrainingStage(StageBase):
+class NestedCrossValidationTrainingStage(Stage):
     def __init__(self):
         # TODO: make models_to_run generator function
         self.models_to_run = None
@@ -222,7 +222,7 @@ class NestedCrossValidationTrainingStage(StageBase):
 
 # TODO: This does not tune hyperparameters yet and shouldn't be used until it's implemented 
 # Note: default to avg across parameter grid
-class NestedCrossValidationTrainingStage(StageBase):
+class NestedCrossValidationTrainingStage(Stage):
     def __init__(self):
         # TODO: make models_to_run generator function
         self._training_context = None
@@ -233,10 +233,10 @@ class NestedCrossValidationTrainingStage(StageBase):
 
     def _validate(self):
         for stage in self._preprocessing_stages:
-            if not issubclass(stage, PreprocessingStageBase):
-                raise ValueError("addPreprocessingStage only accepts PreprocessingStageBase arg type")
-        if not isinstance(self._validation_cv_stage, GenerateCVFolds):
-            raise ValueError("setValidationCVFoldsStage requires GenerateCVFolds arg type")
+            if not issubclass(stage, PreprocessingStage):
+                raise ValueError("addPreprocessingStage only accepts PreprocessingStage arg type")
+        if not isinstance(self._validation_cv_stage, GenerateCVFoldsStage):
+            raise ValueError("setValidationCVFoldsStage requires GenerateCVFoldsStage arg type")
         if not issubclass(self._training_context, SupervisedTrainParamGridContext):
             raise ValueError("setTrainingContext requires SupervisedTrainParamGridContext arg type")
         return
@@ -292,7 +292,7 @@ class NestedCrossValidationTrainingStage(StageBase):
             param_grid_eval_results = []
             for point in param_grid:
                 p = Pipeline()
-                p.addStage(LoadDataFromMemory(data_train))
+                p.addStage(LoadDataFromMemoryDataLoaderStage(data_train))
                 for stage in self._preprocessing_stages:
                     p.addStage(stage)
                 p.addStage(self._validation_cv_stage)

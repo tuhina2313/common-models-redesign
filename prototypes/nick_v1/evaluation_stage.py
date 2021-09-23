@@ -1,11 +1,11 @@
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
-from stage_base import StageBase
+from stage_base import Stage
 
 from utils import get_sklearn_scoring_func as get_eval_func
 
-class EvaluationStage(StageBase):
+class EvaluationStage(Stage):
     def __init__(self, methods):
         if isinstance(methods, str):
             methods = [methods]

@@ -1,0 +1,38 @@
+DONE -- Base class names should be consistent throughout the code and avoid using the extra words in their name. 
+For example, StageBase should be called Stage. Other classes may need to be renamed.
+
+DONE -- Subclasses of base classes should include the base class name. 
+For example, a preprocessing stage should using the base class "Stage" in its name, like PreprocessingStage. 
+A further subclass of this subclass should build off this name, for example, ImputerPreprocessingStage. 
+Using this convention causes the names to grow rapidly, so a deep class hierarchy isn't ideal. 
+So far, our class hierarchy is fairly shallow, but if you discover a need for a deep hierarchy, we should revisit our class naming convention.
+
+DONE -- Correct naming inconsistencies to the following:
+Class Names --> PascalCase
+Functions --> camelCase
+Variables --> under_scores
+
+Rearrange the files and put them in subfolders to make it easier to navigate. 
+For example, util and logging code might belong in a "utils" folder, while all of the stage-related code might go in a "stages" folder. Feel free to play around with organization and try to find something that will work moving forward.
+
+ImputeMissingValsPreprocessingStage
+FeatureScalerPreprocessingStage
+EncodeLabelsPreprocessingStage
+GenerateCVFoldsStage
+
+CSVReaderDataLoaderStage
+LoadDataFromMemoryDataLoaderStage
+LoadFashionMNISTDataLoaderStage
+ModelInitializerStage
+
+class ModelBase(metaclass=ABCMeta): //check 
+
+TensorFlowSupervisedTrainParamGridContext
+class SupervisedTrainParamGridContext(SupervisedTrainPredictContext):
+
+ISSUE #3
+Reasoning: Force future devs to consciously choose whether/how to validate their stages
+
+Implementation: StageBase's execute method should call it's own validate method, then any subclasses of StageBase only need to ensure that they call StageBase's execute method first when execute is called. Please decorate the _validate() function in the base class with an @AbstractMethod tag so the subclasses are forced to override and implement it. Finally, go through all of the code an make sure that each StageBase subclass implements the _validate() method with appropriate validation of variables, etc. Any failed validation should raise an exception and log an error using the logger.
+
+

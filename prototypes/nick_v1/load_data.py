@@ -1,7 +1,7 @@
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
-from stage_base import StageBase
+from stage_base import Stage
 
 from tensorflow import keras
 
@@ -9,13 +9,13 @@ import dask.dataframe as dd
 
 #TODO: add LoadTrainData and LoadTestData Classes, push to c as "train_data" and "test_data"
     
-class DataLoaderStageBase(StageBase):
+class DataLoaderStage(Stage):
     def __init__(self):
         super().__init__()
         self.setLoggingPrefix('DataLoaderStage: ')
 
 
-class CSVReader(DataLoaderStageBase):
+class CSVReaderDataLoaderStage(DataLoaderStage):
     def __init__(self, data_dir, file_name):
         # TODO: Way to handle directory with multiple files
         self.data_path = os.path.join(data_dir, file_name)
@@ -31,7 +31,7 @@ class CSVReader(DataLoaderStageBase):
         return dc
 
 
-class LoadDataFromMemory(DataLoaderStageBase):
+class LoadDataFromMemoryDataLoaderStage(DataLoaderStage):
     def __init__(self, data):
         self.data = data
         super().__init__()
@@ -41,7 +41,7 @@ class LoadDataFromMemory(DataLoaderStageBase):
         return dc
 
 
-class LoadFashionMNIST(DataLoaderStageBase):
+class LoadFashionMNISTDataLoaderStage(DataLoaderStage):
     def __init__(self):
         self.input_dir = "../sample_data/mnist/"
         super().__init__()
